@@ -70,15 +70,24 @@ namespace OperatingSystemHW
             accessor.Write(SUPER_BLOCK_SECTOR * SECTOR_SIZE, ref sb);
         }
 
-        public void ReadBytes(out byte[] buffer, int offset, int count)
+        public void ReadBytes(byte[] buffer, int offset, int count)
         {
-            buffer = new byte[count];
             accessor.ReadArray(offset, buffer, 0, count);
         }
 
         public void WriteBytes(byte[] buffer, int offset)
         {
             accessor.WriteArray(offset, buffer, 0, buffer.Length);
+        }
+
+        public void Read<T>(int position, out T value) where T : unmanaged
+        {
+            accessor.Read(position, out value);
+        }
+
+        public void Write<T>(int position, ref T value) where T : unmanaged
+        {
+            accessor.Write(position, ref value);
         }
     }
 }

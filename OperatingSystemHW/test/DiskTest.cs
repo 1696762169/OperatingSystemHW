@@ -53,7 +53,8 @@ namespace OperatingSystemHW
             {
                 for (int i = 0; i < DiskManager.TOTAL_SECTOR; i++)
                 {
-                    m_DiskManager.ReadBytes(out byte[] buffer, i * DiskManager.SECTOR_SIZE, DiskManager.SECTOR_SIZE);
+                    byte[] buffer = new byte[DiskManager.SECTOR_SIZE];
+                    m_DiskManager.ReadBytes(buffer, i * DiskManager.SECTOR_SIZE, DiskManager.SECTOR_SIZE);
                 }
             }
             Console.WriteLine($"顺序读取测试完成，用时：{(Environment.TickCount - timer) / 1000.0f}s");
@@ -75,7 +76,8 @@ namespace OperatingSystemHW
             timer = Environment.TickCount;
             for (int i = 0; i < DiskManager.TOTAL_SECTOR * round; i++)
             {
-                m_DiskManager.ReadBytes(out byte[] buffer, rand.Next() % DiskManager.TOTAL_SECTOR * DiskManager.SECTOR_SIZE, DiskManager.SECTOR_SIZE);
+                    byte[] buffer = new byte[DiskManager.SECTOR_SIZE];
+                m_DiskManager.ReadBytes(buffer, rand.Next() % DiskManager.TOTAL_SECTOR * DiskManager.SECTOR_SIZE, DiskManager.SECTOR_SIZE);
             }
             Console.WriteLine($"随机读取测试完成，用时：{(Environment.TickCount - timer) / 1000.0f}s");
         }

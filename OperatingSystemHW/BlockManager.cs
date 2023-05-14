@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -20,7 +21,8 @@ namespace OperatingSystemHW
         {
             m_DiskManager = diskManager;
         }
-        
+
+        #region 公共接口
         public Block GetFreeBlock()
         {
             throw new NotImplementedException();
@@ -44,6 +46,15 @@ namespace OperatingSystemHW
         public void WriteBlock(Block block, byte[] buffer, int size = DiskManager.SECTOR_SIZE, int offset = 0)
         {
             throw new NotImplementedException();
+        }
+        #endregion
+
+        // 读取一个外存Inode
+        private DiskInode ReaDiskInode(int inodeNo)
+        {
+            const int START = DiskManager.INODE_START_SECTOR * DiskManager.SECTOR_SIZE;
+            m_DiskManager.Read(START + inodeNo * Marshal.SizeOf<DiskInode>(), out DiskInode ret);
+            return ret;
         }
     }
 }

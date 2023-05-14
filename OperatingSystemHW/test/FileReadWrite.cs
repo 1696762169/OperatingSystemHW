@@ -31,9 +31,8 @@ namespace OperatingSystemHW.test
             }
         }
 
-        public void ReadBytes(out byte[] buffer, int offset, int count)
+        public void ReadBytes(byte[] buffer, int offset, int count)
         {
-            buffer = new byte[count];
             m_File.Seek(offset, SeekOrigin.Begin);
             _ = m_File.Read(buffer, 0, count);
         }
@@ -42,6 +41,16 @@ namespace OperatingSystemHW.test
         {
             m_File.Seek(offset, SeekOrigin.Begin);
             m_File.Write(buffer, 0, buffer.Length);
+        }
+
+        public void Read<T>(int position, out T value) where T : unmanaged
+        {
+            throw new NotImplementedException();
+        }
+
+        public void Write<T>(int position, ref T value) where T : unmanaged
+        {
+            throw new NotImplementedException();
         }
 
         public void Dispose()
