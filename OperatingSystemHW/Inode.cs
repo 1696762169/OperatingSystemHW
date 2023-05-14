@@ -7,9 +7,31 @@ using System.Threading.Tasks;
 namespace OperatingSystemHW
 {
     /// <summary>
+    /// Inode状态标志
+    /// </summary>
+    internal enum InodeFlag
+    {
+        Lock = 0x1,     // 索引节点上锁
+        Update = 0x2,   // 内存inode被修改过，需要更新相应外存inode
+        Access = 0x4,   // 内存inode被访问过，需要修改最近一次访问时间
+        Text = 0x8		// 内存inode对应进程图像的正文段
+    }
+    /// <summary>
     /// 内存Inode结构
     /// </summary>
     internal class Inode
     {
+        public InodeFlag flag;      // 状态标志
+        public int refCount;        // 引用计数
+
+        public int mode;            // 状态的标志位
+        public int linkCount;       // 文件联结计数，即该文件在目录树中不同路径名的数量
+
+        public short uid;           // 文件所有者的用户标识数
+        public short gid;           // 文件所有者的组标识数
+
+        public int size;            // 文件大小，字节为单位
+        public int[] address = new int[10];      // 用于文件逻辑块好和物理块好转换的基本索引表
+
     }
 }

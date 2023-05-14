@@ -10,21 +10,21 @@ namespace OperatingSystemHW
     /// <summary>
     /// img文件操作类
     /// </summary>
-    internal class DiskManager : IDisposable
+    internal class DiskManager : IDisposable, IDiskManager
     {
         #region 常量定义
-        public const int SECTOR_SIZE = 512; // 扇区大小
-
         public const int SUPER_BLOCK_SECTOR = 0;    // 定义SuperBlock位于磁盘上的扇区号 占据0、1两个扇区
-
-        public const int DATA_START_SECTOR = 1024;      // 数据区的起始扇区号
-        public const int DATA_SIZE = 1 << 14;   // 数据区占据的扇区数量（16384）
-        public const int DATA_END_SECTOR = DATA_SIZE + DATA_START_SECTOR - 1;   // 数据区的结束扇区号
 
         public const int ROOT_INODE_NO = 1; // 文件系统根目录外存Inode编号
         public const int INODE_PER_SECTOR = SECTOR_SIZE / 64;    // 每个磁盘块可以存放的外存Inode数
         public const int INODE_START_SECTOR = SUPER_BLOCK_SECTOR + 2;   // 外存Inode区位于磁盘上的起始扇区号
-        public const int INODE_SIZE = DATA_START_SECTOR - INODE_START_SECTOR;	// 外存Inode区占用的盘块数
+        public const int INODE_SIZE = DATA_START_SECTOR - INODE_START_SECTOR;   // 外存Inode区占用的盘块数
+
+        public const int DATA_START_SECTOR = 1024;      // 数据区的起始扇区号
+        public const int DATA_SIZE = 1 << 14;   // 数据区占据的扇区数量（16384）
+
+        public const int SECTOR_SIZE = 512; // 扇区大小
+        public const int TOTAL_SECTOR = DATA_SIZE + DATA_START_SECTOR;   // 总扇区数
         #endregion
 
         private readonly MemoryMappedFile m_MappedFile;    // 内存映射文件
@@ -43,7 +43,7 @@ namespace OperatingSystemHW
                     Directory.CreateDirectory(dir);
                 // 创建文件并设定大小
                 using FileStream fs = File.Create(filePath);
-                fs.SetLength((DATA_END_SECTOR + 1) * SECTOR_SIZE);
+                fs.SetLength(TOTAL_SECTOR * SECTOR_SIZE);
             }
 
             // 创建内存映射文件
@@ -68,6 +68,17 @@ namespace OperatingSystemHW
             // 写入超级块
             SuperBlock sb = SuperBlock.Init();
             accessor.Write(SUPER_BLOCK_SECTOR * SECTOR_SIZE, ref sb);
+        }
+
+        public void ReadBytes(out byte[] buffer, int offset, int count)
+        {
+            buffer = new byte[count];
+            accessor.ReadArray(offset, buffer, 0, count);
+        }
+
+        public void WriteBytes(byte[] buffer, int offset)
+        {
+            accessor.WriteArray(offset, buffer, 0, buffer.Length);
         }
     }
 }
