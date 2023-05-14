@@ -12,14 +12,18 @@ namespace OperatingSystemHW
     /// </summary>
     internal class BlockManager : IBlockManager
     {
-        private readonly List<(int start, int end)> m_FreeBlocks = new();   // 空闲盘块链表
-        private readonly bool[] m_BlockUsed = new bool[DiskManager.TOTAL_SECTOR]; // 盘块使用情况表
+        private readonly bool[] m_BlockUsed = new bool[DiskManager.TOTAL_SECTOR];   // 盘块使用情况表
 
-        private readonly IDiskManager m_DiskManager;                        // 磁盘管理器
+        private readonly IDiskManager m_DiskManager;    // 磁盘管理器
 
         public BlockManager(IDiskManager diskManager)
         {
             m_DiskManager = diskManager;
+
+            // 设置已使用块（超级块必定被使用）
+            m_BlockUsed[DiskManager.SUPER_BLOCK_SECTOR] = true;
+            m_BlockUsed[DiskManager.SUPER_BLOCK_SECTOR + 1] = true;
+            SetUsedBlocks(DiskManager.ROOT_INODE_NO, true);
         }
 
         #region 公共接口
@@ -33,7 +37,7 @@ namespace OperatingSystemHW
             throw new NotImplementedException();
         }
 
-        public void PutBlock(int blockNo)
+        public void PutBlock(Block block)
         {
             throw new NotImplementedException();
         }
@@ -47,14 +51,83 @@ namespace OperatingSystemHW
         {
             throw new NotImplementedException();
         }
+
+        public void ReadStruct<T>(Block block, out T value) where T : unmanaged
+        {
+            throw new NotImplementedException();
+        }
+
+        public void WriteStruct<T>(Block block, ref T value) where T : unmanaged
+        {
+            throw new NotImplementedException();
+        }
+
+        public void ReadArray<T>(Block block, T[] array, int offset, int count) where T : unmanaged
+        {
+            throw new NotImplementedException();
+        }
+
+        public void WriteArray<T>(Block block, T[] array, int offset, int count) where T : unmanaged
+        {
+            throw new NotImplementedException();
+        }
         #endregion
 
+        /// <summary>
+        /// 递归读取外存Inode并设置已使用块
+        /// </summary>
+        /// <param name="inodeNo">当前设置外存Inode序号</param>
+        /// <param name="dir">是否为目录文件</param>
+        private void SetUsedBlocks(int inodeNo, bool dir)
+        {
+            // 读取外存Inode
+            ReadDiskInode(inodeNo, out DiskInode inode);
+
+            // 将其使用块设置为已使用
+            m_BlockUsed[DiskManager.INODE_START_SECTOR + inodeNo / DiskManager.INODE_PER_SECTOR] = true;
+            int[] address = new int[10];
+            unsafe
+            {
+                Marshal.Copy((IntPtr)inode.address, address, 0, address.Length);
+            }
+            List<(int blockNo, bool content)> blocks = new(Utility.GetUsedBlocks(address, inode.size, (blockNo) =>
+            {
+                int[] buffer = new int[DiskManager.SECTOR_SIZE / sizeof(int)];
+                m_DiskManager.ReadArray(blockNo * DiskManager.SECTOR_SIZE, buffer, 0, buffer.Length);
+                return buffer;
+            }));
+            foreach (var tuple in blocks)
+                m_BlockUsed[tuple.blockNo] = true;
+
+            // 如果是目录文件 解析其所有目录项 并递归设置其子目录
+            if (!dir)
+                return;
+            int dirCount = inode.size / Marshal.SizeOf<DirectoryEntry>();
+            foreach (var (blockNo, content) in blocks)
+            {
+                if (!content)
+                    continue;
+                DirectoryEntry[] buffer = new DirectoryEntry[dirCount];
+                m_DiskManager.ReadArray(blockNo * DiskManager.SECTOR_SIZE, buffer, 0, buffer.Length);
+                // 设置子目录或文件
+                foreach (var entry in buffer)
+                {
+                    byte[] nameBuffer = new byte[DirectoryEntry.NAME_MAX_COUNT];
+                    unsafe
+                    {
+                        Marshal.Copy((IntPtr)entry.name, nameBuffer, 0, nameBuffer.Length);
+                    }
+                    string name = Utility.DecodeString(nameBuffer);
+                    SetUsedBlocks(entry.inodeNo, !string.IsNullOrEmpty(name) && (name[^1] == '/' || name[^1] == '\\'));
+                }
+            }
+        }
+
         // 读取一个外存Inode
-        private DiskInode ReaDiskInode(int inodeNo)
+        private void ReadDiskInode(int inodeNo, out DiskInode diskInode)
         {
             const int START = DiskManager.INODE_START_SECTOR * DiskManager.SECTOR_SIZE;
-            m_DiskManager.Read(START + inodeNo * Marshal.SizeOf<DiskInode>(), out DiskInode ret);
-            return ret;
+            m_DiskManager.Read(START + inodeNo * Marshal.SizeOf<DiskInode>(), out diskInode);
         }
     }
 }

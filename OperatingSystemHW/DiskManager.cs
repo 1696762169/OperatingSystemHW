@@ -89,5 +89,15 @@ namespace OperatingSystemHW
         {
             accessor.Write(position, ref value);
         }
+
+        public void ReadArray<T>(int position, T[] array, int offset, int count) where T : unmanaged
+        {
+            accessor.ReadArray(position, array, offset, count);
+        }
+
+        public void WriteArray<T>(int position, T[] array, int offset, int count) where T : unmanaged
+        {
+            accessor.WriteArray(position, array, offset, count);
+        }
     }
 }

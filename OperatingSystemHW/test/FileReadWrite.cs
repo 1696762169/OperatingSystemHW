@@ -53,6 +53,16 @@ namespace OperatingSystemHW.test
             throw new NotImplementedException();
         }
 
+        public void ReadArray<T>(int position, T[] array, int offset, int count) where T : unmanaged
+        {
+            throw new NotImplementedException();
+        }
+
+        public void WriteArray<T>(int position, T[] array, int offset, int count) where T : unmanaged
+        {
+            throw new NotImplementedException();
+        }
+
         public void Dispose()
         {
             m_File.Dispose();
