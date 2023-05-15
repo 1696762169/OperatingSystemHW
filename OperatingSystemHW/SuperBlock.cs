@@ -58,5 +58,64 @@ namespace OperatingSystemHW
             }
             return sb;
         }
+
+        /// <summary>
+        /// 读取签名
+        /// </summary>
+        public string GetSignature()
+        {
+            unsafe
+            {
+                fixed (byte* p = signature)
+                {
+                    return Utility.DecodeString(p, SIGNATURE_SIZE);
+                }
+            }
+        }
+
+        /// <summary>
+        /// 设置签名
+        /// </summary>
+        public void SetSignature(string sign)
+        {
+            unsafe
+            {
+                fixed (byte* p = signature)
+                {
+                    Marshal.Copy(Utility.EncodeString(sign, SIGNATURE_SIZE), 0, (IntPtr)p, SIGNATURE_SIZE);
+                }
+            }
+            m_Modified = 1;
+            m_ModifyTime = Utility.Time;
+        }
+
+        /// <summary>
+        /// 获取一个用户信息
+        /// </summary>
+        public DiskUser GetUser(int index)
+        {
+            unsafe
+            {
+                fixed (byte* up = this.users)
+                {
+                    return *(DiskUser*)(up + index * DiskUser.SIZE);
+                }
+            }
+        }
+        /// <summary>
+        /// 设置一个用户信息
+        /// </summary>
+        public void SetUser(int index, DiskUser user)
+        {
+            unsafe
+            {
+                fixed (byte* up = this.users)
+                {
+                    *(DiskUser*)(up + index * DiskUser.SIZE) = user;
+                }
+            }
+            m_Modified = 1;
+            m_ModifyTime = Utility.Time;
+        }
     }
 }

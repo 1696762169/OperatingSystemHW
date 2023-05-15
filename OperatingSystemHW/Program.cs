@@ -9,10 +9,11 @@ namespace OperatingSystemHW
         {
             string filePath = "disk.img";
 
-            DiskManager diskManager = new(filePath, true);
+            DiskManager diskManager = new(filePath);
             FileSystem fileSystem = new(diskManager);
             BlockManager blockManager = new(diskManager, fileSystem);
 
+            User super = fileSystem.GetUser(0);
             diskManager.Dispose();
         }
     }

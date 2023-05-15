@@ -16,14 +16,5 @@ namespace OperatingSystemHW
         /// 将超级块内容写入文件
         /// </summary>
         public void UpdateSuperBlock();
-
-        /// <summary>
-        /// 获取超级块中的签名
-        /// </summary>
-        public string GetSignature();
-        /// <summary>
-        /// 设置超级块签名
-        /// </summary>
-        public void SetSignature(string signature);
     }
 }

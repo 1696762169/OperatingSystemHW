@@ -23,8 +23,7 @@ namespace OperatingSystemHW
             m_SuperBlockManager = superBlockManager;
 
             // 如有必要 格式化硬盘
-            SuperBlock sb = superBlockManager.Sb;
-            if (m_SuperBlockManager.GetSignature() != "Made by JYX")
+            if (m_SuperBlockManager.Sb.GetSignature() != "Made by JYX")
                 FormatDisk();
 
             // 设置已使用块（超级块必定被使用）
@@ -141,7 +140,7 @@ namespace OperatingSystemHW
         private void FormatDisk()
         {
             // 写入超级块签名
-            m_SuperBlockManager.SetSignature("Made by JYX");
+            m_SuperBlockManager.Sb.SetSignature("Made by JYX");
             m_SuperBlockManager.UpdateSuperBlock();
 
             // 格式化Inode区

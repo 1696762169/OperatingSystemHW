@@ -39,5 +39,31 @@ namespace OperatingSystemHW
                 Current = Utility.DecodeString(diskUser.current.name, DiskUser.NAME_MAX_COUNT);
             }
         }
+
+        /// <summary>
+        /// 将此内存Inode的数据写入外存Inode结构
+        /// </summary>
+        public DiskUser ToDiskUser()
+        {
+            DiskUser diskUser = new()
+            {
+                uid = UserId,
+                gid = GroupId,
+                home = new DirectoryEntry { inodeNo = HomeNo, },
+                current = new DirectoryEntry { inodeNo = CurrentNo, },
+            };
+            unsafe
+            {
+                Marshal.Copy(Utility.EncodeString(Name, DiskUser.NAME_MAX_COUNT), 0, 
+                    (IntPtr)diskUser.name, DiskUser.NAME_MAX_COUNT);
+                Marshal.Copy(Utility.EncodeString(Password, DiskUser.PASSWORD_MAX_COUNT), 0, 
+                    (IntPtr)diskUser.password, DiskUser.PASSWORD_MAX_COUNT);
+                Marshal.Copy(Utility.EncodeString(Home, DirectoryEntry.NAME_MAX_COUNT), 0, 
+                    (IntPtr)diskUser.home.name, DirectoryEntry.NAME_MAX_COUNT);
+                Marshal.Copy(Utility.EncodeString(Current, DirectoryEntry.NAME_MAX_COUNT), 0, 
+                    (IntPtr)diskUser.current.name, DirectoryEntry.NAME_MAX_COUNT);
+            }
+            return diskUser;
+        }
     }
 }

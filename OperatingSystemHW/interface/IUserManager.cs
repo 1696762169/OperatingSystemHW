@@ -11,6 +11,19 @@ namespace OperatingSystemHW
     /// </summary>
     internal interface IUserManager
     {
-
+        /// <summary>
+        /// 获取一个用户信息
+        /// </summary>
+        public User GetUser(int index);
+        /// <summary>
+        /// 更新一个用户信息
+        /// </summary>
+        public void UpdateUser(int index);
+        /// <summary>
+        /// 设置一个用户信息
+        /// </summary>
+        /// <param name="user"></param>
+        /// <param name="index"></param>
+        public void SetUser(User user, int index);
     }
 }

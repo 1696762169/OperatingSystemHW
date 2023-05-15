@@ -13,8 +13,9 @@ namespace OperatingSystemHW
     internal class FileSystem : ISuperBlockManager, IUserManager
     {
         public SuperBlock Sb => m_SuperBlock;   // 超级块
-
         private SuperBlock m_SuperBlock;
+
+        private readonly User[] m_Users = new User[SuperBlock.MAX_USER_COUNT]; // 用户信息
 
         private readonly IDiskManager m_DiskManager;  // 磁盘管理器
 
@@ -35,6 +36,14 @@ namespace OperatingSystemHW
                     }
                 }
             }
+
+            // 读取用户信息
+            for (int i = 0; i < m_SuperBlock.UserCount; i++)
+            {
+                DiskUser diskUser = m_SuperBlock.GetUser(i);
+                if (diskUser.uid != 0)
+                    m_Users[i] = new User(diskUser);
+            }
         }
 
         /// <summary>
@@ -45,26 +54,28 @@ namespace OperatingSystemHW
             m_DiskManager.Write(DiskManager.SUPER_BLOCK_SECTOR * DiskManager.SECTOR_SIZE, ref m_SuperBlock);
         }
 
-        public string GetSignature()
+        public User GetUser(int index)
         {
-            unsafe
-            {
-                fixed (byte* p = m_SuperBlock.signature)
-                {
-                    return Utility.DecodeString(p, SuperBlock.SIGNATURE_SIZE);
-                }
-            }
+            if (!CheckUserIndex(index))
+                throw new ArgumentOutOfRangeException(nameof(index));
+            return m_Users[index];
         }
 
-        public void SetSignature(string signature)
+        public void UpdateUser(int index)
         {
-            unsafe
-            {
-                fixed (byte* p = m_SuperBlock.signature)
-                {
-                    Marshal.Copy(Utility.EncodeString(signature, SuperBlock.SIGNATURE_SIZE), 0, (IntPtr)p, SuperBlock.SIGNATURE_SIZE);
-                }
-            }
+            if (!CheckUserIndex(index))
+                throw new ArgumentOutOfRangeException(nameof(index));
+            m_SuperBlock.SetUser(index, m_Users[index].ToDiskUser());
         }
+
+        public void SetUser(User user, int index)
+        {
+            if (!CheckUserIndex(index))
+                throw new ArgumentOutOfRangeException(nameof(index));
+            m_Users[index] = user;
+            m_SuperBlock.SetUser(index, m_Users[index].ToDiskUser());
+        }
+
+        private static bool CheckUserIndex(int index) => index is >= 0 and < SuperBlock.MAX_USER_COUNT;
     }
 }
