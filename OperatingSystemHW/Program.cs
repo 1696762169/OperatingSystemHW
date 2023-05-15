@@ -8,9 +8,10 @@ namespace OperatingSystemHW
         private static void Main(string[] args)
         {
             string filePath = "disk.img";
-            Console.WriteLine(DiskUser.SIZE);
-            DiskManager diskManager = new DiskManager(filePath);
-            BlockManager blockManager = new BlockManager(diskManager);
+
+            DiskManager diskManager = new(filePath, true);
+            FileSystem fileSystem = new(diskManager);
+            BlockManager blockManager = new(diskManager, fileSystem);
 
             diskManager.Dispose();
         }

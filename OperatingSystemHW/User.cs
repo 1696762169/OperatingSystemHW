@@ -32,16 +32,11 @@ namespace OperatingSystemHW
             CurrentNo = diskUser.current.inodeNo;
             unsafe
             {
-                byte[] buffer = new byte[DiskUser.NAME_MAX_COUNT];
-                Marshal.Copy((IntPtr)diskUser.name, buffer, 0, buffer.Length);
-                Name = Utility.DecodeString(buffer);
-                Marshal.Copy((IntPtr)diskUser.password, buffer, 0, buffer.Length);
-                Password = Utility.DecodeString(buffer);
+                Name = Utility.DecodeString(diskUser.name, DiskUser.NAME_MAX_COUNT);
+                Password = Utility.DecodeString(diskUser.password, DiskUser.NAME_MAX_COUNT);
 
-                Marshal.Copy((IntPtr)diskUser.home.name, buffer, 0, buffer.Length);
-                Home = Utility.DecodeString(buffer);
-                Marshal.Copy((IntPtr)diskUser.current.name, buffer, 0, buffer.Length);
-                Current = Utility.DecodeString(buffer);
+                Home = Utility.DecodeString(diskUser.home.name, DiskUser.NAME_MAX_COUNT);
+                Current = Utility.DecodeString(diskUser.current.name, DiskUser.NAME_MAX_COUNT);
             }
         }
     }

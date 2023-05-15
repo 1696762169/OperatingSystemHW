@@ -25,5 +25,19 @@ namespace OperatingSystemHW
 
         public int accessTime;      // 最后访问时间
         public int modifyTime;		// 最后修改时间
+
+        /// <summary>
+        /// 获取一个空Inode
+        /// </summary>
+        public static DiskInode Empty => new()
+        {
+            mode = 0,
+            linkCount = 0,
+            uid = 0,
+            gid = 0,
+            size = 0,
+            accessTime = 0,
+            modifyTime = 0,
+        };
     }
 }

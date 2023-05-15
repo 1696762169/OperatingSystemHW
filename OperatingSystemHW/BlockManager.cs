@@ -15,14 +15,21 @@ namespace OperatingSystemHW
         private readonly bool[] m_BlockUsed = new bool[DiskManager.TOTAL_SECTOR];   // 盘块使用情况表
 
         private readonly IDiskManager m_DiskManager;    // 磁盘管理器
+        private readonly ISuperBlockManager m_SuperBlockManager;    // 超级块管理器
 
-        public BlockManager(IDiskManager diskManager)
+        public BlockManager(IDiskManager diskManager, ISuperBlockManager superBlockManager)
         {
             m_DiskManager = diskManager;
+            m_SuperBlockManager = superBlockManager;
+
+            // 如有必要 格式化硬盘
+            SuperBlock sb = superBlockManager.Sb;
+            if (m_SuperBlockManager.GetSignature() != "Made by JYX")
+                FormatDisk();
 
             // 设置已使用块（超级块必定被使用）
-            m_BlockUsed[DiskManager.SUPER_BLOCK_SECTOR] = true;
-            m_BlockUsed[DiskManager.SUPER_BLOCK_SECTOR + 1] = true;
+            for (int i = DiskManager.SUPER_BLOCK_SECTOR; i < DiskManager.SUPER_BLOCK_SECTOR + DiskManager.SUPER_BLOCK_SIZE; ++i)
+                m_BlockUsed[i] = true;
             SetUsedBlocks(DiskManager.ROOT_INODE_NO, true);
         }
 
@@ -128,6 +135,25 @@ namespace OperatingSystemHW
         {
             const int START = DiskManager.INODE_START_SECTOR * DiskManager.SECTOR_SIZE;
             m_DiskManager.Read(START + inodeNo * Marshal.SizeOf<DiskInode>(), out diskInode);
+        }
+
+        // 格式化硬盘
+        private void FormatDisk()
+        {
+            // 写入超级块签名
+            m_SuperBlockManager.SetSignature("Made by JYX");
+            m_SuperBlockManager.UpdateSuperBlock();
+
+            // 格式化Inode区
+            DiskInode inode = DiskInode.Empty;
+            for (int i = 0; i < DiskManager.INODE_SIZE * DiskManager.INODE_PER_SECTOR; i++)
+                m_DiskManager.Write(DiskManager.INODE_START_SECTOR * DiskManager.SECTOR_SIZE + i * Marshal.SizeOf<DiskInode>(), ref inode);
+            // 设置根目录Inode
+            inode.linkCount = 1;
+            inode.uid = DiskUser.SUPER_USER_ID;
+            inode.gid = DiskUser.DEFAULT_GROUP_ID;
+            inode.accessTime = inode.modifyTime = Utility.Time;
+            m_DiskManager.Write(DiskManager.INODE_START_SECTOR * DiskManager.SECTOR_SIZE + DiskManager.ROOT_INODE_NO * Marshal.SizeOf<DiskInode>(), ref inode);
         }
     }
 }

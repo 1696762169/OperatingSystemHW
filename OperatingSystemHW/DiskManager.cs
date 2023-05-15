@@ -15,10 +15,11 @@ namespace OperatingSystemHW
     {
         #region 常量定义
         public const int SUPER_BLOCK_SECTOR = 0;    // 定义SuperBlock位于磁盘上的扇区号 占据0、1两个扇区
+        public const int SUPER_BLOCK_SIZE = 2;  // 定义SuperBlock占据的扇区数
 
         public const int ROOT_INODE_NO = 1; // 文件系统根目录外存Inode编号
         public const int INODE_PER_SECTOR = SECTOR_SIZE / DiskInode.SIZE;    // 每个磁盘块可以存放的外存Inode数
-        public const int INODE_START_SECTOR = SUPER_BLOCK_SECTOR + 2;   // 外存Inode区位于磁盘上的起始扇区号
+        public const int INODE_START_SECTOR = SUPER_BLOCK_SECTOR + SUPER_BLOCK_SIZE;   // 外存Inode区位于磁盘上的起始扇区号
         public const int INODE_SIZE = DATA_START_SECTOR - INODE_START_SECTOR;   // 外存Inode区占用的盘块数
 
         public const int DATA_START_SECTOR = 1024;      // 数据区的起始扇区号
@@ -52,39 +53,18 @@ namespace OperatingSystemHW
             // 创建内存映射视图访问器
             accessor = m_MappedFile.CreateViewAccessor();
 
-            // 格式化硬盘
+            // 强制清除签名 通知BlockManager格式化硬盘
             if (!isFileExist || forceCreate)
-                CreateDisk();
+            {
+                byte[] empty = new byte[SUPER_BLOCK_SIZE * SECTOR_SIZE];
+                WriteBytes(empty, SUPER_BLOCK_SECTOR * SECTOR_SIZE);
+            }
         }
 
         public void Dispose()
         {
             m_MappedFile.Dispose();
             accessor.Dispose();
-        }
-
-        // 格式化硬盘
-        private void CreateDisk()
-        {
-            // 写入超级块
-            SuperBlock sb = SuperBlock.Init();
-            accessor.Write(SUPER_BLOCK_SECTOR * SECTOR_SIZE, ref sb);
-
-            // 初始化Inode区
-            DiskInode inode = new()
-            {
-                mode = 0,
-                linkCount = 0,
-                uid = 0,
-                gid = 0,
-                size = 0,
-                accessTime = Utility.Time,
-                modifyTime = Utility.Time,
-            };
-            for (int i = 0; i < INODE_SIZE * INODE_PER_SECTOR; i++)
-                accessor.Write(INODE_START_SECTOR * SECTOR_SIZE + i * Marshal.SizeOf<DiskInode>(), ref inode);
-            inode.uid = DiskUser.SUPER_USER_ID;
-            accessor.Write(INODE_START_SECTOR * SECTOR_SIZE + ROOT_INODE_NO * Marshal.SizeOf<DiskInode>(), ref inode);
         }
 
         public void ReadBytes(byte[] buffer, int offset, int count)

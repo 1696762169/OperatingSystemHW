@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -11,7 +12,14 @@ namespace OperatingSystemHW
         public static int Time => (int)DateTime.Now.Subtract(new DateTime(1970, 1, 1)).TotalSeconds;
 
         public static byte[] EncodeString(string str) => Encoding.UTF8.GetBytes(str);
-        public static string DecodeString(byte[] data) => Encoding.UTF8.GetString(data);
+        public static byte[] EncodeString(string str, int size)
+        {
+            byte[] buffer = new byte[size];
+            Array.Copy(EncodeString(str), buffer, Math.Min(size, str.Length));
+            return buffer;
+        }
+        public static string DecodeString(byte[] data) => Encoding.UTF8.GetString(data).Trim('\0');
+        public static unsafe string DecodeString(byte* data, int count) => Encoding.UTF8.GetString(data, count).Trim('\0');
 
         /// <summary>
         /// 根据Inode地址项获取其使用的所有盘块
