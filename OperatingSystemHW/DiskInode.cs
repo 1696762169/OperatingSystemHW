@@ -23,8 +23,9 @@ namespace OperatingSystemHW
         public int size;            // 文件大小，字节为单位
         public unsafe fixed int address[10];    // 用于文件逻辑块和物理块转换的基本索引表
 
-        public int accessTime;      // 最后访问时间
-        public int modifyTime;		// 最后修改时间
+        // 这两个时间其实根本没有被使用
+        public int dummyAccessTime;     // 最后访问时间
+        public int dummyModifyTime;		// 最后修改时间
 
         /// <summary>
         /// 获取一个空Inode
@@ -36,8 +37,8 @@ namespace OperatingSystemHW
             uid = 0,
             gid = 0,
             size = 0,
-            accessTime = 0,
-            modifyTime = 0,
+            dummyAccessTime = 0,
+            dummyModifyTime = 0,
         };
     }
 }

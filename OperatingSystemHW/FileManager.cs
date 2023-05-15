@@ -11,12 +11,12 @@ namespace OperatingSystemHW
     /// </summary>
     internal class FileManager : IFileManager
     {
-        private readonly IBlockManager m_BlockManager;    // 文件块管理器
+        private readonly ISectorManager m_SectorManager;    // 文件块管理器
         private readonly IUserManager m_UserManager;      // 用户管理器
 
-        public FileManager(IBlockManager blockManager, IUserManager userManager)
+        public FileManager(ISectorManager sectorManager, IUserManager userManager)
         {
-            m_BlockManager = blockManager;
+            m_SectorManager = sectorManager;
             m_UserManager = userManager;
         }
 

@@ -9,7 +9,8 @@ namespace OperatingSystemHW
 {
     internal static class Utility
     {
-        public static int Time => (int)DateTime.Now.Subtract(new DateTime(1970, 1, 1)).TotalSeconds;
+        private static readonly DateTime _StartTime = new (1970, 1, 1);
+        public static int Time => (int)DateTime.Now.Subtract(_StartTime).TotalSeconds;
 
         public static byte[] EncodeString(string str) => Encoding.UTF8.GetBytes(str);
         public static byte[] EncodeString(string str, int size)
@@ -68,14 +69,14 @@ namespace OperatingSystemHW
         /// 使用BufferManager根据Inode地址项获取其使用的所有盘块
         /// </summary>
         /// <returns>blockNo表示盘块序号 content表示该盘块是否包含实际内容</returns>
-        public static IEnumerable<(int blockNo, bool content)> GetUsedBlocks(IReadOnlyList<int> address, int size, IBlockManager blockManager)
+        public static IEnumerable<(int blockNo, bool content)> GetUsedBlocks(IReadOnlyList<int> address, int size, ISectorManager sectorManager)
         {
             return GetUsedBlocks(address, size, (blockNo) =>
             {
                 int[] ret = new int[DiskManager.SECTOR_SIZE / sizeof(int)];
-                Block block = blockManager.GetBlock(blockNo);
-                blockManager.ReadArray(block, ret, 0, ret.Length);
-                blockManager.PutBlock(block);
+                Block block = sectorManager.GetBlock(blockNo);
+                sectorManager.ReadArray(block, ret, 0, ret.Length);
+                sectorManager.PutBlock(block);
                 return ret;
             });
         }

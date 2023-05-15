@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -21,8 +22,8 @@ namespace OperatingSystemHW
     /// </summary>
     internal class Inode
     {
-        public InodeFlag flag;      // 状态标志
-        public int refCount;        // 引用计数
+        //public InodeFlag flag;      // 状态标志
+        //public int refCount;        // 引用计数
 
         public int mode;            // 状态的标志位
         public int linkCount;       // 文件联结计数，即该文件在目录树中不同路径名的数量
@@ -33,5 +34,41 @@ namespace OperatingSystemHW
         public int size;            // 文件大小，字节为单位
         public int[] address = new int[10];      // 用于文件逻辑块好和物理块好转换的基本索引表
 
+        public Inode(DiskInode diskInode)
+        {
+            mode = diskInode.mode;
+            linkCount = diskInode.linkCount;
+
+            uid = diskInode.uid;
+            gid = diskInode.gid;
+            
+            size = diskInode.size;
+            unsafe
+            {
+                Marshal.Copy((IntPtr)diskInode.address, address, 0, 10);
+            }
+        }
+
+        /// <summary>
+        /// 将内存Inode转换为外存Inode
+        /// </summary>
+        public DiskInode ToDiskInode()
+        {
+            DiskInode diskInode = new()
+            {
+                mode = this.mode,
+                linkCount = this.linkCount,
+                uid = this.uid,
+                gid = this.gid,
+                size = this.size,
+                dummyAccessTime = Utility.Time,
+                dummyModifyTime = Utility.Time,
+            };
+            unsafe
+            {
+                Marshal.Copy(address, 0, (IntPtr)diskInode.address, 10);
+            }
+            return diskInode;
+        }
     }
 }

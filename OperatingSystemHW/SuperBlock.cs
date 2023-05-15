@@ -24,7 +24,7 @@ namespace OperatingSystemHW
         public const int MAX_USER_COUNT = SIZE / DiskUser.SIZE - 1; // 最大用户数
 
         public const int SIGNATURE_SIZE = 12;   // 签名区大小
-        public const int PADDING_SIZE = SIZE - MAX_USER_COUNT * DiskUser.SIZE - sizeof(int) * 5 - SIGNATURE_SIZE;	// 填充区大小
+        public const int PADDING_SIZE = SIZE - MAX_USER_COUNT * DiskUser.SIZE - sizeof(int) * 7 - SIGNATURE_SIZE;	// 填充区大小
 
         public unsafe fixed byte users[MAX_USER_COUNT * DiskUser.SIZE]; // 用户信息表
         private int m_UserCount;    // 用户数
@@ -35,10 +35,15 @@ namespace OperatingSystemHW
         public int Modified => m_Modified;
         public int ModifyTime => m_ModifyTime;
 
-        public int m_FreeSector;    // 数据区空闲盘块数
-        public int m_DataSector;    // 数据区总盘快数
-        public int FreeCount=> m_FreeSector;
+        private int m_FreeSector;    // 数据区空闲盘块数
+        private int m_DataSector;    // 数据区总盘快数
+        public int FreeCount => m_FreeSector;
         public int DataSector => m_DataSector;
+
+        private int m_FreeInode; // 空闲外存Inode数
+        private int m_InodeCount;   // 外存Inode总数
+        public int FreeInode => m_FreeInode;
+        public int InodeCount => m_InodeCount;
 
         public unsafe fixed byte signature[SIGNATURE_SIZE];	// 签名区
         private unsafe fixed byte m_Padding[PADDING_SIZE];	// 填充区
@@ -55,6 +60,8 @@ namespace OperatingSystemHW
                 m_ModifyTime = Utility.Time,
                 m_FreeSector = DiskManager.DATA_SIZE,
                 m_DataSector = DiskManager.DATA_SIZE,
+                m_FreeInode = DiskManager.INODE_SIZE * DiskManager.INODE_PER_SECTOR - 1,    // 不可使用0号Inode
+                m_InodeCount = DiskManager.INODE_SIZE * DiskManager.INODE_PER_SECTOR - 1,
             };
 
             // 添加超级用户
@@ -123,9 +130,15 @@ namespace OperatingSystemHW
             Modify();
         }
 
-        public void SetFreeCount(int count)
+        public void SetFreeSector(int count)
         {
             m_FreeSector = count;
+            Modify();
+        }
+
+        public void SetFreeInode(int count)
+        {
+            m_FreeInode = count;
             Modify();
         }
 

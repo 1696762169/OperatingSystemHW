@@ -10,15 +10,24 @@ namespace OperatingSystemHW
     /// <summary>
     /// 文件块管理器
     /// </summary>
-    internal class BlockManager : IBlockManager
+    internal class BlockManager : ISectorManager, IInodeManager
     {
-        private readonly bool[] m_BlockUsed = new bool[DiskManager.TOTAL_SECTOR];   // 盘块使用情况表
-        private int m_SearchFreeBlock = DiskManager.DATA_START_SECTOR;  // 空闲盘块搜索指针
-        private int m_FreeCount
+        private readonly bool[] m_SectorUsed = new bool[DiskManager.TOTAL_SECTOR];   // 盘块使用情况表
+        private int m_SearchFreeSector = DiskManager.DATA_START_SECTOR;  // 空闲盘块搜索指针
+        private int FreeSector
         {
             get => m_SuperBlockManager.Sb.FreeCount;
-            set => m_SuperBlockManager.Sb.SetFreeCount(value);
+            set => m_SuperBlockManager.Sb.SetFreeSector(value);
         } // 空闲盘块数量
+
+        private readonly bool[] m_InodeUsed = new bool[DiskManager.INODE_SIZE * DiskManager.INODE_PER_SECTOR]; // Inode使用情况表
+        private int m_SearchFreeInode = 1;  // 空闲Inode搜索指针（不可尝试搜索0号Inode）
+
+        private int FreeInode
+        {
+            get => m_SuperBlockManager.Sb.InodeCount;
+            set => m_SuperBlockManager.Sb.SetFreeInode(value);
+        } // 空闲Inode数量
 
         private readonly IDiskManager m_DiskManager;    // 磁盘管理器
         private readonly ISuperBlockManager m_SuperBlockManager;    // 超级块管理器
@@ -34,11 +43,11 @@ namespace OperatingSystemHW
 
             // 设置已使用块（超级块必定被使用）
             for (int i = DiskManager.SUPER_BLOCK_SECTOR; i < DiskManager.SUPER_BLOCK_SECTOR + DiskManager.SUPER_BLOCK_SIZE; ++i)
-                m_BlockUsed[i] = true;
+                m_SectorUsed[i] = true;
             SetUsedBlocks(DiskManager.ROOT_INODE_NO, true);
         }
 
-        #region 公共接口
+        #region 数据操作公共接口
         public IEnumerable<Block> GetFreeBlock(int count)
         {
             for (int i = 0; i < count; ++i)
@@ -47,32 +56,32 @@ namespace OperatingSystemHW
 
         public Block GetFreeBlock()
         {
-            if (m_FreeCount <= 0)
+            if (FreeSector <= 0)
                 throw new Exception("磁盘已满");
-            while (m_BlockUsed[m_SearchFreeBlock])
+            while (m_SectorUsed[m_SearchFreeSector])
             {
-                ++m_SearchFreeBlock;
-                if (m_SearchFreeBlock >= m_BlockUsed.Length)
-                    m_SearchFreeBlock = DiskManager.DATA_START_SECTOR;
+                ++m_SearchFreeSector;
+                if (m_SearchFreeSector >= m_SectorUsed.Length)
+                    m_SearchFreeSector = DiskManager.DATA_START_SECTOR;
             }
-            return GetBlock(m_SearchFreeBlock);
+            return GetBlock(m_SearchFreeSector);
         }
 
         public Block GetBlock(int blockNo)
         {
-            if (m_BlockUsed[blockNo])
+            if (m_SectorUsed[blockNo])
                 throw new Exception($"盘块 {blockNo} 已被使用");
-            m_BlockUsed[blockNo] = true;
+            m_SectorUsed[blockNo] = true;
             if (blockNo >= DiskManager.DATA_START_SECTOR)
-                --m_FreeCount;
+                --FreeSector;
             return new Block(blockNo);
         }
 
         public void PutBlock(Block block)
         {
-            m_BlockUsed[block.Number] = false;
-            if (block.Number >= DiskManager.DATA_START_SECTOR)
-                ++m_FreeCount;
+            if (block.Number >= DiskManager.DATA_START_SECTOR && m_SectorUsed[block.Number])
+                ++FreeSector;
+            m_SectorUsed[block.Number] = false;
         }
 
         public void ReadBlock(Block block, byte[] buffer, int size = DiskManager.SECTOR_SIZE, int offset = 0)
@@ -106,6 +115,45 @@ namespace OperatingSystemHW
         }
         #endregion
 
+        #region Inode操作公共接口
+        public Inode GetFreeInode()
+        {
+            if (FreeInode <= 0)
+                throw new Exception("没有空闲的Inode");
+            while (m_InodeUsed[m_SearchFreeInode])
+            {
+                ++m_SearchFreeInode;
+                if (m_SearchFreeInode >= m_InodeUsed.Length)
+                    m_SearchFreeInode = 1;
+            }
+            return GetInode(m_SearchFreeInode);
+        }
+
+        public Inode GetInode(int inodeNo)
+        {
+            if (m_InodeUsed[inodeNo])
+                throw new Exception($"Inode {inodeNo} 已被使用");
+            m_InodeUsed[inodeNo] = true;
+            --FreeInode;
+
+            ReadDiskInode(inodeNo, out DiskInode diskInode);
+            return new Inode(diskInode);
+        }
+
+        public void PutInode(int inodeNo)
+        {
+            if (m_InodeUsed[inodeNo])
+                ++FreeInode;
+            m_InodeUsed[inodeNo] = false;
+        }
+
+        public void UpdateInode(int inodeNo, Inode inode)
+        {
+            DiskInode diskInode = inode.ToDiskInode();
+            WriteDiskInode(inodeNo, ref diskInode);
+        }
+        #endregion
+
         /// <summary>
         /// 递归读取外存Inode并设置已使用块
         /// </summary>
@@ -117,7 +165,7 @@ namespace OperatingSystemHW
             ReadDiskInode(inodeNo, out DiskInode inode);
 
             // 将其使用块设置为已使用
-            m_BlockUsed[DiskManager.INODE_START_SECTOR + inodeNo / DiskManager.INODE_PER_SECTOR] = true;
+            m_SectorUsed[DiskManager.INODE_START_SECTOR + inodeNo / DiskManager.INODE_PER_SECTOR] = true;
             int[] address = new int[10];
             unsafe
             {
@@ -130,7 +178,7 @@ namespace OperatingSystemHW
                 return buffer;
             }));
             foreach (var tuple in blocks)
-                m_BlockUsed[tuple.blockNo] = true;
+                m_SectorUsed[tuple.blockNo] = true;
 
             // 如果是目录文件 解析其所有目录项 并递归设置其子目录
             if (!dir)
@@ -162,6 +210,18 @@ namespace OperatingSystemHW
             const int START = DiskManager.INODE_START_SECTOR * DiskManager.SECTOR_SIZE;
             m_DiskManager.Read(START + inodeNo * Marshal.SizeOf<DiskInode>(), out diskInode);
         }
+        // 写入一个外存Inode
+        private void WriteDiskInode(int inodeNo, ref DiskInode diskInode)
+        {
+            const int START = DiskManager.INODE_START_SECTOR * DiskManager.SECTOR_SIZE;
+            m_DiskManager.Write(START + inodeNo * Marshal.SizeOf<DiskInode>(), ref diskInode);
+        }
+
+        // 判断一个盘块是否可用
+        private bool IsBlockUsed(Block block)
+        {
+            return m_SectorUsed[block.Number];
+        }
 
         // 格式化硬盘
         private void FormatDisk()
@@ -178,7 +238,7 @@ namespace OperatingSystemHW
             inode.linkCount = 1;
             inode.uid = DiskUser.SUPER_USER_ID;
             inode.gid = DiskUser.DEFAULT_GROUP_ID;
-            inode.accessTime = inode.modifyTime = Utility.Time;
+            inode.dummyAccessTime = inode.dummyModifyTime = Utility.Time;
             m_DiskManager.Write(DiskManager.INODE_START_SECTOR * DiskManager.SECTOR_SIZE + DiskManager.ROOT_INODE_NO * Marshal.SizeOf<DiskInode>(), ref inode);
         }
     }
