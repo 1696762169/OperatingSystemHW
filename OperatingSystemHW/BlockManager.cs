@@ -14,7 +14,11 @@ namespace OperatingSystemHW
     {
         private readonly bool[] m_BlockUsed = new bool[DiskManager.TOTAL_SECTOR];   // 盘块使用情况表
         private int m_SearchFreeBlock = DiskManager.DATA_START_SECTOR;  // 空闲盘块搜索指针
-        private int m_FreeBlockCount; // 空闲盘块数量
+        private int m_FreeCount
+        {
+            get => m_SuperBlockManager.Sb.FreeCount;
+            set => m_SuperBlockManager.Sb.SetFreeCount(value);
+        } // 空闲盘块数量
 
         private readonly IDiskManager m_DiskManager;    // 磁盘管理器
         private readonly ISuperBlockManager m_SuperBlockManager;    // 超级块管理器
@@ -32,9 +36,6 @@ namespace OperatingSystemHW
             for (int i = DiskManager.SUPER_BLOCK_SECTOR; i < DiskManager.SUPER_BLOCK_SECTOR + DiskManager.SUPER_BLOCK_SIZE; ++i)
                 m_BlockUsed[i] = true;
             SetUsedBlocks(DiskManager.ROOT_INODE_NO, true);
-
-            // 记录空闲盘块数量
-            m_FreeBlockCount = m_SuperBlockManager.Sb.FreeCount;
         }
 
         #region 公共接口
@@ -46,7 +47,7 @@ namespace OperatingSystemHW
 
         public Block GetFreeBlock()
         {
-            if (m_FreeBlockCount <= 0)
+            if (m_FreeCount <= 0)
                 throw new Exception("磁盘已满");
             while (m_BlockUsed[m_SearchFreeBlock])
             {
@@ -63,7 +64,7 @@ namespace OperatingSystemHW
                 throw new Exception($"盘块 {blockNo} 已被使用");
             m_BlockUsed[blockNo] = true;
             if (blockNo >= DiskManager.DATA_START_SECTOR)
-                --m_FreeBlockCount;
+                --m_FreeCount;
             return new Block(blockNo);
         }
 
@@ -71,7 +72,7 @@ namespace OperatingSystemHW
         {
             m_BlockUsed[block.Number] = false;
             if (block.Number >= DiskManager.DATA_START_SECTOR)
-                ++m_FreeBlockCount;
+                ++m_FreeCount;
         }
 
         public void ReadBlock(Block block, byte[] buffer, int size = DiskManager.SECTOR_SIZE, int offset = 0)

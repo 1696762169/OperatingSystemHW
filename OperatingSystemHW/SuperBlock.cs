@@ -37,15 +37,7 @@ namespace OperatingSystemHW
 
         public int m_FreeSector;    // 数据区空闲盘块数
         public int m_DataSector;    // 数据区总盘快数
-        public int FreeCount
-        {
-            get => m_FreeSector;
-            set
-            {
-                m_FreeSector = value;
-                Modify();
-            }
-        }
+        public int FreeCount=> m_FreeSector;
         public int DataSector => m_DataSector;
 
         public unsafe fixed byte signature[SIGNATURE_SIZE];	// 签名区
@@ -128,6 +120,12 @@ namespace OperatingSystemHW
                     *(DiskUser*)(up + index * DiskUser.SIZE) = user;
                 }
             }
+            Modify();
+        }
+
+        public void SetFreeCount(int count)
+        {
+            m_FreeSector = count;
             Modify();
         }
 

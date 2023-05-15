@@ -11,7 +11,7 @@ namespace OperatingSystemHW
     /// </summary>
     internal interface ISuperBlockManager
     {
-        public SuperBlock Sb { get; }   // 超级块
+        public ref SuperBlock Sb { get; }
         /// <summary>
         /// 将超级块内容写入文件
         /// </summary>

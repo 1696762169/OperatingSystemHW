@@ -12,7 +12,8 @@ namespace OperatingSystemHW
     /// </summary>
     internal class FileSystem : ISuperBlockManager, IUserManager
     {
-        public SuperBlock Sb => m_SuperBlock;   // 超级块
+        public ref SuperBlock Sb => ref m_SuperBlock;
+
         private SuperBlock m_SuperBlock;
 
         public User Current => m_Users[m_CurrentIndex];
