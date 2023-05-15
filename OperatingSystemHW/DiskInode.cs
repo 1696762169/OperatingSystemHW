@@ -12,10 +12,12 @@ namespace OperatingSystemHW
     /// </summary>
     internal struct DiskInode
     {
+        public const int SIZE = 64; // 外存Inode结构大小
+
         public int mode;            // 状态的标志位
         public int linkCount;       // 文件联结计数，即该文件在目录树中不同路径名的数量
 
-        public short uid;           // 文件所有者的用户标识数
+        public short uid;           // 文件所有者的用户标识数 0表示未使用
         public short gid;           // 文件所有者的组标识数
 
         public int size;            // 文件大小，字节为单位
