@@ -13,7 +13,7 @@ namespace OperatingSystemHW
     {
         public ref SuperBlock Sb { get; }
         /// <summary>
-        /// 将超级块内容写入文件
+        /// 将超级块中的非用户内容写入文件
         /// </summary>
         public void UpdateSuperBlock();
     }

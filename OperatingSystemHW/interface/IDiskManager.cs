@@ -11,16 +11,12 @@ namespace OperatingSystemHW
         /// <summary>
         /// 读取字节
         /// </summary>
-        /// <param name="offset"></param>
-        /// <param name="count"></param>
-        /// <param name="buffer"></param>
         public void ReadBytes(byte[] buffer, int offset, int count);
         /// <summary>
         /// 写入字节
         /// </summary>
-        /// <param name="offset"></param>
-        /// <param name="buffer"></param>
         public void WriteBytes(byte[] buffer, int offset);
+        public void WriteBytes(byte[] buffer, int offset, int count);
 
         /// <summary>
         /// 在指定位置读取结构体

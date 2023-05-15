@@ -1,4 +1,5 @@
-﻿using System;
+﻿#define DEBUG_CHECK_FREE
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -41,10 +42,39 @@ namespace OperatingSystemHW
             if (m_SuperBlockManager.Sb.GetSignature() != "Made by JYX")
                 FormatDisk();
 
-            // 设置已使用块（超级块必定被使用）
+            // 设置已使用块（超级块必定被使用）与Inode
             for (int i = DiskManager.SUPER_BLOCK_SECTOR; i < DiskManager.SUPER_BLOCK_SECTOR + DiskManager.SUPER_BLOCK_SIZE; ++i)
                 m_SectorUsed[i] = true;
             SetUsedBlocks(DiskManager.ROOT_INODE_NO, true);
+
+#if DEBUG_CHECK_FREE
+            // 检查空闲盘块数量和空闲Inode数量是否正确
+            int freeSector = 0;
+            for (int i = DiskManager.DATA_START_SECTOR; i < m_SectorUsed.Length; ++i)
+                if (!m_SectorUsed[i])
+                    ++freeSector;
+            int freeInode = m_InodeUsed.Count(t => !t);
+            if (freeSector != FreeSector)
+            {
+                FreeSector = freeSector;
+                m_SuperBlockManager.UpdateSuperBlock();
+                Console.WriteLine($"空闲盘块数量不正确，已修正为{freeSector}");
+            }
+            else
+            {
+                Console.WriteLine($"空闲盘块数量正确，为{freeSector}");
+            }
+            if (freeInode != FreeInode)
+            {
+                FreeInode = freeInode;
+                m_SuperBlockManager.UpdateSuperBlock();
+                Console.WriteLine($"空闲Inode数量不正确，已修正为{freeInode}");
+            }
+            else
+            {
+                Console.WriteLine($"空闲Inode数量正确，为{freeInode}");
+            }
+#endif
         }
 
         #region 数据操作公共接口
@@ -73,45 +103,71 @@ namespace OperatingSystemHW
                 throw new Exception($"盘块 {blockNo} 已被使用");
             m_SectorUsed[blockNo] = true;
             if (blockNo >= DiskManager.DATA_START_SECTOR)
+            {
                 --FreeSector;
+                m_SuperBlockManager.UpdateSuperBlock();
+            }
             return new Block(blockNo);
         }
 
         public void PutBlock(Block block)
         {
             if (block.Number >= DiskManager.DATA_START_SECTOR && m_SectorUsed[block.Number])
+            {
                 ++FreeSector;
+                m_SuperBlockManager.UpdateSuperBlock();
+            }
             m_SectorUsed[block.Number] = false;
         }
 
-        public void ReadBlock(Block block, byte[] buffer, int size = DiskManager.SECTOR_SIZE, int offset = 0)
+        public void ReadBlock(Block block, byte[] buffer, int size = DiskManager.SECTOR_SIZE, int position = 0)
         {
-            throw new NotImplementedException();
+            EnsureBlockUsed(block);
+            if (size + position > DiskManager.SECTOR_SIZE)
+                throw new ArgumentOutOfRangeException($"读取范围（position：{position} + size：{size}）超过盘块大小");
+            m_DiskManager.ReadBytes(buffer, DiskManager.SECTOR_SIZE * block.Number + position, size);
         }
 
-        public void WriteBlock(Block block, byte[] buffer, int size = DiskManager.SECTOR_SIZE, int offset = 0)
+        public void WriteBlock(Block block, byte[] buffer, int size = DiskManager.SECTOR_SIZE, int position = 0)
         {
-            throw new NotImplementedException();
+            EnsureBlockUsed(block);
+            if (position + size > DiskManager.SECTOR_SIZE)
+                throw new ArgumentOutOfRangeException($"写入范围（position：{position} + size：{size}）超过盘块大小");
+            m_DiskManager.WriteBytes(buffer, DiskManager.SECTOR_SIZE * block.Number + position, size);
         }
 
-        public void ReadStruct<T>(Block block, out T value) where T : unmanaged
+        public void ReadStruct<T>(Block block, out T value, int position = 0) where T : unmanaged
         {
-            throw new NotImplementedException();
+            EnsureBlockUsed(block);
+            if (position + Marshal.SizeOf<T>() > DiskManager.SECTOR_SIZE)
+                throw new ArgumentOutOfRangeException($"读取范围（position：{position} + sizeof({typeof(T).Name})：{Marshal.SizeOf<T>()}）超过盘块大小");
+            m_DiskManager.Read(DiskManager.SECTOR_SIZE * block.Number + position, out value);
         }
 
-        public void WriteStruct<T>(Block block, ref T value) where T : unmanaged
+        public void WriteStruct<T>(Block block, ref T value, int position = 0) where T : unmanaged
         {
-            throw new NotImplementedException();
+            EnsureBlockUsed(block);
+            if (position + Marshal.SizeOf<T>() > DiskManager.SECTOR_SIZE)
+                throw new ArgumentOutOfRangeException($"写入范围（position：{position} + sizeof({typeof(T).Name})：{Marshal.SizeOf<T>()}）超过盘块大小");
+            m_DiskManager.Write(DiskManager.SECTOR_SIZE * block.Number + position, ref value);
         }
 
-        public void ReadArray<T>(Block block, T[] array, int offset, int count) where T : unmanaged
+        public void ReadArray<T>(Block block, T[] array, int offset, int count, int position = 0) where T : unmanaged
         {
-            throw new NotImplementedException();
+            EnsureBlockUsed(block);
+            if (position + count * Marshal.SizeOf<T>() > DiskManager.SECTOR_SIZE)
+                throw new ArgumentOutOfRangeException(
+                    $"读取范围（position：{position} + count：{count} * sizeof({typeof(T).Name})：{Marshal.SizeOf<T>()}）超过盘块大小");
+            m_DiskManager.ReadArray(DiskManager.SECTOR_SIZE * block.Number + position, array, offset, count);
         }
 
-        public void WriteArray<T>(Block block, T[] array, int offset, int count) where T : unmanaged
+        public void WriteArray<T>(Block block, T[] array, int offset, int count, int position = 0) where T : unmanaged
         {
-            throw new NotImplementedException();
+            EnsureBlockUsed(block);
+            if (position + count * Marshal.SizeOf<T>() > DiskManager.SECTOR_SIZE)
+                throw new ArgumentOutOfRangeException(
+                                       $"写入范围（position：{position} + count：{count} * sizeof({typeof(T).Name})：{Marshal.SizeOf<T>()}）超过盘块大小");
+            m_DiskManager.WriteArray(DiskManager.SECTOR_SIZE * block.Number + position, array, offset, count);
         }
         #endregion
 
@@ -135,6 +191,7 @@ namespace OperatingSystemHW
                 throw new Exception($"Inode {inodeNo} 已被使用");
             m_InodeUsed[inodeNo] = true;
             --FreeInode;
+            m_SuperBlockManager.UpdateSuperBlock();
 
             ReadDiskInode(inodeNo, out DiskInode diskInode);
             return new Inode(diskInode);
@@ -142,8 +199,9 @@ namespace OperatingSystemHW
 
         public void PutInode(int inodeNo)
         {
-            if (m_InodeUsed[inodeNo])
-                ++FreeInode;
+            if (!m_InodeUsed[inodeNo]) return;
+            ++FreeInode;
+            m_SuperBlockManager.UpdateSuperBlock();
             m_InodeUsed[inodeNo] = false;
         }
 
@@ -163,6 +221,8 @@ namespace OperatingSystemHW
         {
             // 读取外存Inode
             ReadDiskInode(inodeNo, out DiskInode inode);
+            // 记录该Inode已使用
+            m_InodeUsed[inodeNo] = true;
 
             // 将其使用块设置为已使用
             m_SectorUsed[DiskManager.INODE_START_SECTOR + inodeNo / DiskManager.INODE_PER_SECTOR] = true;
@@ -208,19 +268,20 @@ namespace OperatingSystemHW
         private void ReadDiskInode(int inodeNo, out DiskInode diskInode)
         {
             const int START = DiskManager.INODE_START_SECTOR * DiskManager.SECTOR_SIZE;
-            m_DiskManager.Read(START + inodeNo * Marshal.SizeOf<DiskInode>(), out diskInode);
+            m_DiskManager.Read(START + inodeNo * DiskInode.SIZE, out diskInode);
         }
         // 写入一个外存Inode
         private void WriteDiskInode(int inodeNo, ref DiskInode diskInode)
         {
             const int START = DiskManager.INODE_START_SECTOR * DiskManager.SECTOR_SIZE;
-            m_DiskManager.Write(START + inodeNo * Marshal.SizeOf<DiskInode>(), ref diskInode);
+            m_DiskManager.Write(START + inodeNo * DiskInode.SIZE, ref diskInode);
         }
 
         // 判断一个盘块是否可用
-        private bool IsBlockUsed(Block block)
+        private void EnsureBlockUsed(Block block)
         {
-            return m_SectorUsed[block.Number];
+            if (!m_SectorUsed[block.Number])
+                throw new Exception($"盘块 {block.Number} 未被使用");
         }
 
         // 格式化硬盘

@@ -15,9 +15,10 @@ namespace OperatingSystemHW
         public ref SuperBlock Sb => ref m_SuperBlock;
 
         private SuperBlock m_SuperBlock;
+        private readonly byte[] m_UpdateBuffer = new byte[SuperBlock.NO_USER_SIZE];
 
-        public User Current => m_Users[m_CurrentIndex];
-        private int m_CurrentIndex = 0;
+        public User Current => m_Users[CurrentIndex];
+        public int CurrentIndex { get; private set; } = 0;
         private readonly User[] m_Users = new User[SuperBlock.MAX_USER_COUNT]; // 用户信息
 
         private readonly IDiskManager m_DiskManager;  // 磁盘管理器
@@ -50,18 +51,25 @@ namespace OperatingSystemHW
         }
 
         /// <summary>
-        /// 将超级块内容写入文件
+        /// 将超级块中的非用户内容写入文件
         /// </summary>
         public void UpdateSuperBlock()
         {
-            m_DiskManager.Write(DiskManager.SUPER_BLOCK_SECTOR * DiskManager.SECTOR_SIZE, ref m_SuperBlock);
+            unsafe
+            {
+                fixed (SuperBlock* sb = &m_SuperBlock)
+                {
+                    Marshal.Copy((IntPtr)((byte*)sb + SuperBlock.NO_USER_START), m_UpdateBuffer, 0, SuperBlock.NO_USER_SIZE);
+                    m_DiskManager.WriteBytes(m_UpdateBuffer, DiskManager.SUPER_BLOCK_SECTOR * DiskManager.SECTOR_SIZE + SuperBlock.NO_USER_START);
+                }
+            }
         }
 
         public void SetCurrent(int index)
         {
             if (!CheckUserIndex(index))
                 throw new ArgumentOutOfRangeException(nameof(index));
-            m_CurrentIndex = index;
+            CurrentIndex = index;
         }
 
         public User GetUser(int index)
@@ -76,6 +84,7 @@ namespace OperatingSystemHW
             if (!CheckUserIndex(index))
                 throw new ArgumentOutOfRangeException(nameof(index));
             m_SuperBlock.SetUser(index, m_Users[index].ToDiskUser());
+            m_DiskManager.Write(DiskManager.SUPER_BLOCK_SECTOR * DiskManager.SECTOR_SIZE, ref m_SuperBlock);
         }
 
         public void SetUser(User user, int index)
@@ -84,8 +93,17 @@ namespace OperatingSystemHW
                 throw new ArgumentOutOfRangeException(nameof(index));
             m_Users[index] = user;
             m_SuperBlock.SetUser(index, m_Users[index].ToDiskUser());
+            m_DiskManager.Write(DiskManager.SUPER_BLOCK_SECTOR * DiskManager.SECTOR_SIZE, ref m_SuperBlock);
         }
 
         private static bool CheckUserIndex(int index) => index is >= 0 and < SuperBlock.MAX_USER_COUNT;
+
+        /// <summary>
+        /// 将用户数据写入外存
+        /// </summary>
+        private void UpdateUser()
+        {
+
+        }
     }
 }

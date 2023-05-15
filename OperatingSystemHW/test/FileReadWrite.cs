@@ -43,6 +43,11 @@ namespace OperatingSystemHW.test
             m_File.Write(buffer, 0, buffer.Length);
         }
 
+        public void WriteBytes(byte[] buffer, int offset, int count)
+        {
+            throw new NotImplementedException();
+        }
+
         public void Read<T>(int position, out T value) where T : unmanaged
         {
             throw new NotImplementedException();

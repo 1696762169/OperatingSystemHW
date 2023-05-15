@@ -9,7 +9,7 @@ namespace OperatingSystemHW
     /// <summary>
     /// 文件块管理器接口
     /// </summary>
-    internal interface IBlockManager
+    internal interface ISectorManager
     {
         /// <summary>
         /// 获取空闲盘块的控制权
@@ -33,20 +33,20 @@ namespace OperatingSystemHW
         /// <summary>
         /// 读取一个盘块中的内容
         /// </summary>
-        public void ReadBlock(Block block, byte[] buffer, int size = DiskManager.SECTOR_SIZE, int offset = 0);
+        public void ReadBlock(Block block, byte[] buffer, int size = DiskManager.SECTOR_SIZE, int position = 0);
         /// <summary>
         /// 向一个盘块中写入内容
         /// </summary>
-        public void WriteBlock(Block block, byte[] buffer, int size = DiskManager.SECTOR_SIZE, int offset = 0);
+        public void WriteBlock(Block block, byte[] buffer, int size = DiskManager.SECTOR_SIZE, int position = 0);
 
         /// <summary>
         /// 在指定位置读取结构体 其大小不得超过盘块大小
         /// </summary>
-        public void ReadStruct<T>(Block block, out T value) where T : unmanaged;
+        public void ReadStruct<T>(Block block, out T value, int position = 0) where T : unmanaged;
         /// <summary>
         /// 在指定位置写入结构体 其大小不得超过盘块大小
         /// </summary>
-        public void WriteStruct<T>(Block block, ref T value) where T : unmanaged;
+        public void WriteStruct<T>(Block block, ref T value, int position = 0) where T : unmanaged;
 
         /// <summary>
         /// 读取数组 总大小不得超过盘块大小
@@ -55,7 +55,9 @@ namespace OperatingSystemHW
         /// <param name="array">数据存储数组</param>
         /// <param name="offset">数组序号偏移量</param>
         /// <param name="count">读取元素数量</param>
-        public void ReadArray<T>(Block block, T[] array, int offset, int count) where T : unmanaged;
+        /// <param name="position"></param>
+        public void ReadArray<T>(Block block, T[] array, int offset, int count, int position = 0) where T : unmanaged;
+
         /// <summary>
         /// 写入数组 总大小不得超过盘块大小
         /// </summary>
@@ -63,6 +65,7 @@ namespace OperatingSystemHW
         /// <param name="array">数据存储数组</param>
         /// <param name="offset">数组序号偏移量</param>
         /// <param name="count">写入元素数量</param>
-        public void WriteArray<T>(Block block, T[] array, int offset, int count) where T : unmanaged;
+        /// <param name="position"></param>
+        public void WriteArray<T>(Block block, T[] array, int offset, int count, int position = 0) where T : unmanaged;
     }
 }

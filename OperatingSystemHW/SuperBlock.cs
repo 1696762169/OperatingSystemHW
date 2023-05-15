@@ -22,6 +22,8 @@ namespace OperatingSystemHW
 
         public const int SIZE = DiskManager.SUPER_BLOCK_SIZE * DiskManager.SECTOR_SIZE; // 超级块大小
         public const int MAX_USER_COUNT = SIZE / DiskUser.SIZE - 1; // 最大用户数
+        public const int NO_USER_START = MAX_USER_COUNT * DiskUser.SIZE; // 非用户信息区起始位置
+        public const int NO_USER_SIZE = SIZE - NO_USER_START; // 非用户信息区大小
 
         public const int SIGNATURE_SIZE = 12;   // 签名区大小
         public const int PADDING_SIZE = SIZE - MAX_USER_COUNT * DiskUser.SIZE - sizeof(int) * 7 - SIGNATURE_SIZE;	// 填充区大小

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics.Metrics;
 using System.IO.MemoryMappedFiles;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -75,6 +76,11 @@ namespace OperatingSystemHW
         public void WriteBytes(byte[] buffer, int offset)
         {
             accessor.WriteArray(offset, buffer, 0, buffer.Length);
+        }
+
+        public void WriteBytes(byte[] buffer, int offset, int count)
+        {
+            accessor.WriteArray(offset, buffer, 0, count);
         }
 
         public void Read<T>(int position, out T value) where T : unmanaged
