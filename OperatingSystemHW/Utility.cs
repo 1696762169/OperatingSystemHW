@@ -74,9 +74,9 @@ namespace OperatingSystemHW
             return GetUsedBlocks(address, size, (blockNo) =>
             {
                 int[] ret = new int[DiskManager.SECTOR_SIZE / sizeof(int)];
-                Block block = sectorManager.GetBlock(blockNo);
-                sectorManager.ReadArray(block, ret, 0, ret.Length);
-                sectorManager.PutBlock(block);
+                Sector sector = sectorManager.GetSector(blockNo);
+                sectorManager.ReadArray(sector, ret, 0, ret.Length);
+                sectorManager.PutSector(sector);
                 return ret;
             });
         }

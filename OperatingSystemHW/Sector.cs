@@ -24,10 +24,10 @@ namespace OperatingSystemHW
     /// <summary>
     /// 文件块结构
     /// </summary>
-    internal class Block
+    internal class Sector
     {
         public int Number { get; private set; }         // 文件块逻辑序号
-        public Block(int number)
+        public Sector(int number)
         {
             Number = number;
         }

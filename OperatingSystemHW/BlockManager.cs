@@ -13,13 +13,13 @@ namespace OperatingSystemHW
     /// </summary>
     internal class BlockManager : ISectorManager, IInodeManager
     {
-        private readonly bool[] m_SectorUsed = new bool[DiskManager.TOTAL_SECTOR];   // 盘块使用情况表
-        private int m_SearchFreeSector = DiskManager.DATA_START_SECTOR;  // 空闲盘块搜索指针
+        private readonly bool[] m_SectorUsed = new bool[DiskManager.TOTAL_SECTOR];   // 扇区使用情况表
+        private int m_SearchFreeSector = DiskManager.DATA_START_SECTOR;  // 空闲扇区搜索指针
         private int FreeSector
         {
             get => m_SuperBlockManager.Sb.FreeCount;
             set => m_SuperBlockManager.Sb.SetFreeSector(value);
-        } // 空闲盘块数量
+        } // 空闲扇区数量
 
         private readonly bool[] m_InodeUsed = new bool[DiskManager.INODE_SIZE * DiskManager.INODE_PER_SECTOR]; // Inode使用情况表
         private int m_SearchFreeInode = 1;  // 空闲Inode搜索指针（不可尝试搜索0号Inode）
@@ -48,7 +48,7 @@ namespace OperatingSystemHW
             SetUsedBlocks(DiskManager.ROOT_INODE_NO, true);
 
 #if DEBUG_CHECK_FREE
-            // 检查空闲盘块数量和空闲Inode数量是否正确
+            // 检查空闲扇区数量和空闲Inode数量是否正确
             int freeSector = 0;
             for (int i = DiskManager.DATA_START_SECTOR; i < m_SectorUsed.Length; ++i)
                 if (!m_SectorUsed[i])
@@ -58,11 +58,11 @@ namespace OperatingSystemHW
             {
                 FreeSector = freeSector;
                 m_SuperBlockManager.UpdateSuperBlock();
-                Console.WriteLine($"空闲盘块数量不正确，已修正为{freeSector}");
+                Console.WriteLine($"空闲扇区数量不正确，已修正为{freeSector}");
             }
             else
             {
-                Console.WriteLine($"空闲盘块数量正确，为{freeSector}");
+                Console.WriteLine($"空闲扇区数量正确，为{freeSector}");
             }
             if (freeInode != FreeInode)
             {
@@ -78,13 +78,13 @@ namespace OperatingSystemHW
         }
 
         #region 数据操作公共接口
-        public IEnumerable<Block> GetFreeBlock(int count)
+        public IEnumerable<Sector> GetFreeSector(int count)
         {
             for (int i = 0; i < count; ++i)
-                yield return GetFreeBlock();
+                yield return GetFreeSector();
         }
 
-        public Block GetFreeBlock()
+        public Sector GetFreeSector()
         {
             if (FreeSector <= 0)
                 throw new Exception("磁盘已满");
@@ -94,80 +94,80 @@ namespace OperatingSystemHW
                 if (m_SearchFreeSector >= m_SectorUsed.Length)
                     m_SearchFreeSector = DiskManager.DATA_START_SECTOR;
             }
-            return GetBlock(m_SearchFreeSector);
+            return GetSector(m_SearchFreeSector);
         }
 
-        public Block GetBlock(int blockNo)
+        public Sector GetSector(int blockNo)
         {
             if (m_SectorUsed[blockNo])
-                throw new Exception($"盘块 {blockNo} 已被使用");
+                throw new Exception($"扇区 {blockNo} 已被使用");
             m_SectorUsed[blockNo] = true;
             if (blockNo >= DiskManager.DATA_START_SECTOR)
             {
                 --FreeSector;
                 m_SuperBlockManager.UpdateSuperBlock();
             }
-            return new Block(blockNo);
+            return new Sector(blockNo);
         }
 
-        public void PutBlock(Block block)
+        public void PutSector(Sector sector)
         {
-            if (block.Number >= DiskManager.DATA_START_SECTOR && m_SectorUsed[block.Number])
+            if (sector.Number >= DiskManager.DATA_START_SECTOR && m_SectorUsed[sector.Number])
             {
                 ++FreeSector;
                 m_SuperBlockManager.UpdateSuperBlock();
             }
-            m_SectorUsed[block.Number] = false;
+            m_SectorUsed[sector.Number] = false;
         }
 
-        public void ReadBlock(Block block, byte[] buffer, int size = DiskManager.SECTOR_SIZE, int position = 0)
+        public void ReadBytes(Sector sector, byte[] buffer, int size = DiskManager.SECTOR_SIZE, int position = 0)
         {
-            EnsureBlockUsed(block);
+            EnsureSectorUsed(sector);
             if (size + position > DiskManager.SECTOR_SIZE)
-                throw new ArgumentOutOfRangeException($"读取范围（position：{position} + size：{size}）超过盘块大小");
-            m_DiskManager.ReadBytes(buffer, DiskManager.SECTOR_SIZE * block.Number + position, size);
+                throw new ArgumentOutOfRangeException($"读取范围（position：{position} + size：{size}）超过扇区大小");
+            m_DiskManager.ReadBytes(buffer, DiskManager.SECTOR_SIZE * sector.Number + position, size);
         }
 
-        public void WriteBlock(Block block, byte[] buffer, int size = DiskManager.SECTOR_SIZE, int position = 0)
+        public void WriteBytes(Sector sector, byte[] buffer, int size = DiskManager.SECTOR_SIZE, int position = 0)
         {
-            EnsureBlockUsed(block);
+            EnsureSectorUsed(sector);
             if (position + size > DiskManager.SECTOR_SIZE)
-                throw new ArgumentOutOfRangeException($"写入范围（position：{position} + size：{size}）超过盘块大小");
-            m_DiskManager.WriteBytes(buffer, DiskManager.SECTOR_SIZE * block.Number + position, size);
+                throw new ArgumentOutOfRangeException($"写入范围（position：{position} + size：{size}）超过扇区大小");
+            m_DiskManager.WriteBytes(buffer, DiskManager.SECTOR_SIZE * sector.Number + position, size);
         }
 
-        public void ReadStruct<T>(Block block, out T value, int position = 0) where T : unmanaged
+        public void ReadStruct<T>(Sector sector, out T value, int position = 0) where T : unmanaged
         {
-            EnsureBlockUsed(block);
+            EnsureSectorUsed(sector);
             if (position + Marshal.SizeOf<T>() > DiskManager.SECTOR_SIZE)
-                throw new ArgumentOutOfRangeException($"读取范围（position：{position} + sizeof({typeof(T).Name})：{Marshal.SizeOf<T>()}）超过盘块大小");
-            m_DiskManager.Read(DiskManager.SECTOR_SIZE * block.Number + position, out value);
+                throw new ArgumentOutOfRangeException($"读取范围（position：{position} + sizeof({typeof(T).Name})：{Marshal.SizeOf<T>()}）超过扇区大小");
+            m_DiskManager.Read(DiskManager.SECTOR_SIZE * sector.Number + position, out value);
         }
 
-        public void WriteStruct<T>(Block block, ref T value, int position = 0) where T : unmanaged
+        public void WriteStruct<T>(Sector sector, ref T value, int position = 0) where T : unmanaged
         {
-            EnsureBlockUsed(block);
+            EnsureSectorUsed(sector);
             if (position + Marshal.SizeOf<T>() > DiskManager.SECTOR_SIZE)
-                throw new ArgumentOutOfRangeException($"写入范围（position：{position} + sizeof({typeof(T).Name})：{Marshal.SizeOf<T>()}）超过盘块大小");
-            m_DiskManager.Write(DiskManager.SECTOR_SIZE * block.Number + position, ref value);
+                throw new ArgumentOutOfRangeException($"写入范围（position：{position} + sizeof({typeof(T).Name})：{Marshal.SizeOf<T>()}）超过扇区大小");
+            m_DiskManager.Write(DiskManager.SECTOR_SIZE * sector.Number + position, ref value);
         }
 
-        public void ReadArray<T>(Block block, T[] array, int offset, int count, int position = 0) where T : unmanaged
+        public void ReadArray<T>(Sector sector, T[] array, int offset, int count, int position = 0) where T : unmanaged
         {
-            EnsureBlockUsed(block);
+            EnsureSectorUsed(sector);
             if (position + count * Marshal.SizeOf<T>() > DiskManager.SECTOR_SIZE)
                 throw new ArgumentOutOfRangeException(
-                    $"读取范围（position：{position} + count：{count} * sizeof({typeof(T).Name})：{Marshal.SizeOf<T>()}）超过盘块大小");
-            m_DiskManager.ReadArray(DiskManager.SECTOR_SIZE * block.Number + position, array, offset, count);
+                    $"读取范围（position：{position} + count：{count} * sizeof({typeof(T).Name})：{Marshal.SizeOf<T>()}）超过扇区大小");
+            m_DiskManager.ReadArray(DiskManager.SECTOR_SIZE * sector.Number + position, array, offset, count);
         }
 
-        public void WriteArray<T>(Block block, T[] array, int offset, int count, int position = 0) where T : unmanaged
+        public void WriteArray<T>(Sector sector, T[] array, int offset, int count, int position = 0) where T : unmanaged
         {
-            EnsureBlockUsed(block);
+            EnsureSectorUsed(sector);
             if (position + count * Marshal.SizeOf<T>() > DiskManager.SECTOR_SIZE)
                 throw new ArgumentOutOfRangeException(
-                                       $"写入范围（position：{position} + count：{count} * sizeof({typeof(T).Name})：{Marshal.SizeOf<T>()}）超过盘块大小");
-            m_DiskManager.WriteArray(DiskManager.SECTOR_SIZE * block.Number + position, array, offset, count);
+                    $"写入范围（position：{position} + count：{count} * sizeof({typeof(T).Name})：{Marshal.SizeOf<T>()}）超过扇区大小");
+            m_DiskManager.WriteArray(DiskManager.SECTOR_SIZE * sector.Number + position, array, offset, count);
         }
         #endregion
 
@@ -277,11 +277,11 @@ namespace OperatingSystemHW
             m_DiskManager.Write(START + inodeNo * DiskInode.SIZE, ref diskInode);
         }
 
-        // 判断一个盘块是否可用
-        private void EnsureBlockUsed(Block block)
+        // 判断一个扇区是否可用
+        private void EnsureSectorUsed(Sector sector)
         {
-            if (!m_SectorUsed[block.Number])
-                throw new Exception($"盘块 {block.Number} 未被使用");
+            if (!m_SectorUsed[sector.Number])
+                throw new Exception($"扇区 {sector.Number} 未被使用");
         }
 
         // 格式化硬盘
