@@ -15,6 +15,8 @@ namespace OperatingSystemHW
         public SuperBlock Sb => m_SuperBlock;   // 超级块
         private SuperBlock m_SuperBlock;
 
+        public User Current => m_Users[m_CurrentIndex];
+        private int m_CurrentIndex = 0;
         private readonly User[] m_Users = new User[SuperBlock.MAX_USER_COUNT]; // 用户信息
 
         private readonly IDiskManager m_DiskManager;  // 磁盘管理器
@@ -52,6 +54,13 @@ namespace OperatingSystemHW
         public void UpdateSuperBlock()
         {
             m_DiskManager.Write(DiskManager.SUPER_BLOCK_SECTOR * DiskManager.SECTOR_SIZE, ref m_SuperBlock);
+        }
+
+        public void SetCurrent(int index)
+        {
+            if (!CheckUserIndex(index))
+                throw new ArgumentOutOfRangeException(nameof(index));
+            m_CurrentIndex = index;
         }
 
         public User GetUser(int index)

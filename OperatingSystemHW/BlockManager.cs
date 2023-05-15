@@ -13,6 +13,8 @@ namespace OperatingSystemHW
     internal class BlockManager : IBlockManager
     {
         private readonly bool[] m_BlockUsed = new bool[DiskManager.TOTAL_SECTOR];   // 盘块使用情况表
+        private int m_SearchFreeBlock = DiskManager.DATA_START_SECTOR;  // 空闲盘块搜索指针
+        private int m_FreeBlockCount; // 空闲盘块数量
 
         private readonly IDiskManager m_DiskManager;    // 磁盘管理器
         private readonly ISuperBlockManager m_SuperBlockManager;    // 超级块管理器
@@ -30,22 +32,46 @@ namespace OperatingSystemHW
             for (int i = DiskManager.SUPER_BLOCK_SECTOR; i < DiskManager.SUPER_BLOCK_SECTOR + DiskManager.SUPER_BLOCK_SIZE; ++i)
                 m_BlockUsed[i] = true;
             SetUsedBlocks(DiskManager.ROOT_INODE_NO, true);
+
+            // 记录空闲盘块数量
+            m_FreeBlockCount = m_SuperBlockManager.Sb.FreeCount;
         }
 
         #region 公共接口
+        public IEnumerable<Block> GetFreeBlock(int count)
+        {
+            for (int i = 0; i < count; ++i)
+                yield return GetFreeBlock();
+        }
+
         public Block GetFreeBlock()
         {
-            throw new NotImplementedException();
+            if (m_FreeBlockCount <= 0)
+                throw new Exception("磁盘已满");
+            while (m_BlockUsed[m_SearchFreeBlock])
+            {
+                ++m_SearchFreeBlock;
+                if (m_SearchFreeBlock >= m_BlockUsed.Length)
+                    m_SearchFreeBlock = DiskManager.DATA_START_SECTOR;
+            }
+            return GetBlock(m_SearchFreeBlock);
         }
 
         public Block GetBlock(int blockNo)
         {
-            throw new NotImplementedException();
+            if (m_BlockUsed[blockNo])
+                throw new Exception($"盘块 {blockNo} 已被使用");
+            m_BlockUsed[blockNo] = true;
+            if (blockNo >= DiskManager.DATA_START_SECTOR)
+                --m_FreeBlockCount;
+            return new Block(blockNo);
         }
 
         public void PutBlock(Block block)
         {
-            throw new NotImplementedException();
+            m_BlockUsed[block.Number] = false;
+            if (block.Number >= DiskManager.DATA_START_SECTOR)
+                ++m_FreeBlockCount;
         }
 
         public void ReadBlock(Block block, byte[] buffer, int size = DiskManager.SECTOR_SIZE, int offset = 0)

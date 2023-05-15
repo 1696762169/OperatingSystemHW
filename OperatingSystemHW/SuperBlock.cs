@@ -24,7 +24,7 @@ namespace OperatingSystemHW
         public const int MAX_USER_COUNT = SIZE / DiskUser.SIZE - 1; // 最大用户数
 
         public const int SIGNATURE_SIZE = 12;   // 签名区大小
-        public const int PADDING_SIZE = SIZE - MAX_USER_COUNT * DiskUser.SIZE - sizeof(int) * 3 - SIGNATURE_SIZE;	// 填充区大小
+        public const int PADDING_SIZE = SIZE - MAX_USER_COUNT * DiskUser.SIZE - sizeof(int) * 5 - SIGNATURE_SIZE;	// 填充区大小
 
         public unsafe fixed byte users[MAX_USER_COUNT * DiskUser.SIZE]; // 用户信息表
         private int m_UserCount;    // 用户数
@@ -34,6 +34,19 @@ namespace OperatingSystemHW
         private int m_ModifyTime;   // 最近一次更新时间
         public int Modified => m_Modified;
         public int ModifyTime => m_ModifyTime;
+
+        public int m_FreeSector;    // 数据区空闲盘块数
+        public int m_DataSector;    // 数据区总盘快数
+        public int FreeCount
+        {
+            get => m_FreeSector;
+            set
+            {
+                m_FreeSector = value;
+                Modify();
+            }
+        }
+        public int DataSector => m_DataSector;
 
         public unsafe fixed byte signature[SIGNATURE_SIZE];	// 签名区
         private unsafe fixed byte m_Padding[PADDING_SIZE];	// 填充区
@@ -48,6 +61,8 @@ namespace OperatingSystemHW
                 m_UserCount = 1,
                 m_Modified = 0,
                 m_ModifyTime = Utility.Time,
+                m_FreeSector = DiskManager.DATA_SIZE,
+                m_DataSector = DiskManager.DATA_SIZE,
             };
 
             // 添加超级用户
@@ -85,8 +100,7 @@ namespace OperatingSystemHW
                     Marshal.Copy(Utility.EncodeString(sign, SIGNATURE_SIZE), 0, (IntPtr)p, SIGNATURE_SIZE);
                 }
             }
-            m_Modified = 1;
-            m_ModifyTime = Utility.Time;
+            Modify();
         }
 
         /// <summary>
@@ -114,6 +128,11 @@ namespace OperatingSystemHW
                     *(DiskUser*)(up + index * DiskUser.SIZE) = user;
                 }
             }
+            Modify();
+        }
+
+        private void Modify()
+        {
             m_Modified = 1;
             m_ModifyTime = Utility.Time;
         }

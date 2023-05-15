@@ -12,6 +12,7 @@ namespace OperatingSystemHW
             DiskManager diskManager = new(filePath);
             FileSystem fileSystem = new(diskManager);
             BlockManager blockManager = new(diskManager, fileSystem);
+            FileManager fileManager = new(blockManager, fileSystem);
 
             User super = fileSystem.GetUser(0);
             diskManager.Dispose();

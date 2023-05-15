@@ -12,6 +12,11 @@ namespace OperatingSystemHW
     internal interface IBlockManager
     {
         /// <summary>
+        /// 获取空闲盘块的控制权
+        /// </summary>
+        /// <param name="count">需要获取的盘块数</param>
+        public IEnumerable<Block> GetFreeBlock(int count);
+        /// <summary>
         /// 获取一个空闲盘块的控制权
         /// </summary>
         public Block GetFreeBlock();

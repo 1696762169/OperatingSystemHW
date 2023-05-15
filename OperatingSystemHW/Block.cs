@@ -26,6 +26,10 @@ namespace OperatingSystemHW
     /// </summary>
     internal class Block
     {
-        public int number;          // 文件块逻辑序号
+        public int Number { get; private set; }         // 文件块逻辑序号
+        public Block(int number)
+        {
+            Number = number;
+        }
     }
 }

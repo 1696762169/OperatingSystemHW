@@ -11,6 +11,9 @@ namespace OperatingSystemHW
     /// </summary>
     internal interface IUserManager
     {
+        public User Current { get; }   // 当前用户
+        public void SetCurrent(int index);  // 设置当前用户
+
         /// <summary>
         /// 获取一个用户信息
         /// </summary>
