@@ -24,6 +24,8 @@ namespace OperatingSystemHW
         public int CurrentNo { get; private set; }   // 用户信息在外存中的Inode编号
         public string Current { get; private set; }  // 用户当前目录
 
+        public List<Entry> CurrentEntries { get; private set; } = new(); // 当前目录下的文件目录项
+
         public User(DiskUser diskUser)
         {
             UserId = diskUser.uid;
@@ -64,6 +66,11 @@ namespace OperatingSystemHW
                     (IntPtr)diskUser.current.name, DirectoryEntry.NAME_MAX_COUNT);
             }
             return diskUser;
+        }
+
+        public void ChangeDirectory(Entry)
+        {
+            
         }
     }
 }

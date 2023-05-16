@@ -45,7 +45,7 @@ namespace OperatingSystemHW
             // 设置已使用块（超级块必定被使用）与Inode
             for (int i = DiskManager.SUPER_BLOCK_SECTOR; i < DiskManager.SUPER_BLOCK_SECTOR + DiskManager.SUPER_BLOCK_SIZE; ++i)
                 m_SectorUsed[i] = true;
-            SetUsedBlocks(DiskManager.ROOT_INODE_NO, true);
+            SetUsedSectors(DiskManager.ROOT_INODE_NO, true);
 
 #if DEBUG_CHECK_FREE
             // 检查空闲扇区数量和空闲Inode数量是否正确
@@ -217,7 +217,7 @@ namespace OperatingSystemHW
         /// </summary>
         /// <param name="inodeNo">当前设置外存Inode序号</param>
         /// <param name="dir">是否为目录文件</param>
-        private void SetUsedBlocks(int inodeNo, bool dir)
+        private void SetUsedSectors(int inodeNo, bool dir)
         {
             // 读取外存Inode
             ReadDiskInode(inodeNo, out DiskInode inode);
@@ -231,35 +231,37 @@ namespace OperatingSystemHW
             {
                 Marshal.Copy((IntPtr)inode.address, address, 0, address.Length);
             }
-            List<(int blockNo, bool content)> blocks = new(Utility.GetUsedBlocks(address, inode.size, (blockNo) =>
+            List<(int sectorNo, bool content)> sectors = new(Utility.GetUsedSectors(address, inode.size, (blockNo) =>
             {
                 int[] buffer = new int[DiskManager.SECTOR_SIZE / sizeof(int)];
                 m_DiskManager.ReadArray(blockNo * DiskManager.SECTOR_SIZE, buffer, 0, buffer.Length);
                 return buffer;
             }));
-            foreach (var tuple in blocks)
-                m_SectorUsed[tuple.blockNo] = true;
+            foreach (var tuple in sectors)
+                m_SectorUsed[tuple.sectorNo] = true;
 
             // 如果是目录文件 解析其所有目录项 并递归设置其子目录
             if (!dir)
                 return;
             int dirCount = inode.size / Marshal.SizeOf<DirectoryEntry>();
-            foreach (var (blockNo, content) in blocks)
+            DirectoryEntry[] buffer = new DirectoryEntry[DiskManager.SECTOR_SIZE / Marshal.SizeOf<DirectoryEntry>()];
+            byte[] nameBuffer = new byte[DirectoryEntry.NAME_MAX_COUNT];
+            foreach (var (sectorNo, content) in sectors)
             {
                 if (!content)
                     continue;
-                DirectoryEntry[] buffer = new DirectoryEntry[dirCount];
-                m_DiskManager.ReadArray(blockNo * DiskManager.SECTOR_SIZE, buffer, 0, buffer.Length);
+                m_DiskManager.ReadArray(sectorNo * DiskManager.SECTOR_SIZE, buffer, 0, buffer.Length);
                 // 设置子目录或文件
                 foreach (var entry in buffer)
                 {
-                    byte[] nameBuffer = new byte[DirectoryEntry.NAME_MAX_COUNT];
                     unsafe
                     {
                         Marshal.Copy((IntPtr)entry.name, nameBuffer, 0, nameBuffer.Length);
                     }
                     string name = Utility.DecodeString(nameBuffer);
-                    SetUsedBlocks(entry.inodeNo, !string.IsNullOrEmpty(name) && (name[^1] == '/' || name[^1] == '\\'));
+                    SetUsedSectors(entry.inodeNo, !string.IsNullOrEmpty(name) && name[^1] == '/');
+                    if (--dirCount <= 0)
+                        return;
                 }
             }
         }

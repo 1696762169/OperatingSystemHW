@@ -29,7 +29,7 @@ namespace OperatingSystemHW
         /// <param name="size">文件大小</param>
         /// <param name="getBlock">获取盘块的方法 一般需要使用BlockManager</param>
         /// <returns>blockNo表示盘块序号 content表示该盘块是否包含实际内容</returns>
-        public static IEnumerable<(int blockNo, bool content)> GetUsedBlocks(IReadOnlyList<int> address, int size, Func<int, int[]> getBlock)
+        public static IEnumerable<(int blockNo, bool content)> GetUsedSectors(IReadOnlyList<int> address, int size, Func<int, int[]> getBlock)
         {
             int sector = size / DiskManager.SECTOR_SIZE + (size % DiskManager.SECTOR_SIZE == 0 ? 0 : 1);
             // 一级索引
@@ -64,14 +64,13 @@ namespace OperatingSystemHW
                 }
             }
         }
-
         /// <summary>
         /// 使用BufferManager根据Inode地址项获取其使用的所有盘块
         /// </summary>
         /// <returns>blockNo表示盘块序号 content表示该盘块是否包含实际内容</returns>
-        public static IEnumerable<(int blockNo, bool content)> GetUsedBlocks(IReadOnlyList<int> address, int size, ISectorManager sectorManager)
+        public static IEnumerable<(int blockNo, bool content)> GetUsedSectors(IReadOnlyList<int> address, int size, ISectorManager sectorManager)
         {
-            return GetUsedBlocks(address, size, (blockNo) =>
+            return GetUsedSectors(address, size, (blockNo) =>
             {
                 int[] ret = new int[DiskManager.SECTOR_SIZE / sizeof(int)];
                 Sector sector = sectorManager.GetSector(blockNo);
@@ -80,5 +79,13 @@ namespace OperatingSystemHW
                 return ret;
             });
         }
+    }
+
+    /// <summary>
+    /// 文件路径搜索相关工具
+    /// </summary>
+    internal static class DirectoryUtility
+    {
+        
     }
 }
