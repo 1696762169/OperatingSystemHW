@@ -1,6 +1,7 @@
 ﻿#define DEBUG_CHECK_FREE
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -100,12 +101,12 @@ namespace OperatingSystemHW
             return GetSector(m_SearchFreeSector);
         }
 
-        public Sector GetSector(int blockNo)
+        public Sector GetSector(int sectorNo)
         {
-            if (m_SectorLocks.Contains(blockNo))
-                throw new Exception($"扇区 {blockNo} 已被使用");
-            m_SectorLocks.Add(blockNo);
-            return new Sector(blockNo);
+            if (m_SectorLocks.Contains(sectorNo))
+                throw new Exception($"扇区 {sectorNo} 已被使用");
+            m_SectorLocks.Add(sectorNo);
+            return new Sector(sectorNo, this);
         }
 
         public void PutSector(Sector sector)
@@ -200,7 +201,7 @@ namespace OperatingSystemHW
             m_InodeLocks.Add(inodeNo);
 
             ReadDiskInode(inodeNo, out DiskInode diskInode);
-            return new Inode(diskInode);
+            return new Inode(diskInode, inodeNo, this);
         }
 
         public void PutInode(int inodeNo)
@@ -280,7 +281,7 @@ namespace OperatingSystemHW
                         Marshal.Copy((IntPtr)entry.name, nameBuffer, 0, nameBuffer.Length);
                     }
                     string name = Utility.DecodeString(nameBuffer);
-                    SetUsedSectors(entry.inodeNo, !string.IsNullOrEmpty(name) && name[^1] == '/');
+                    SetUsedSectors(entry.inodeNo, !string.IsNullOrEmpty(name) && PathUtility.IsDirectory(name));
                     if (--dirCount <= 0)
                         return;
                 }

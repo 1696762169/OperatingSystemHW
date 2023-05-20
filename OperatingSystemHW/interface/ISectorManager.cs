@@ -24,7 +24,7 @@ namespace OperatingSystemHW
         /// <summary>
         /// 获取一个指定盘块的控制权
         /// </summary>
-        public Sector GetSector(int blockNo);
+        public Sector GetSector(int sectorNo);
         /// <summary>
         /// 归还一个指定盘块的控制权
         /// </summary>

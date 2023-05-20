@@ -27,7 +27,7 @@ namespace OperatingSystemHW
         /// <summary>
         /// 创建文件
         /// </summary>
-        public void Create(string path);
+        public void CreateFile(string path);
         /// <summary>
         /// 删除文件
         /// </summary>
@@ -46,5 +46,11 @@ namespace OperatingSystemHW
         /// 移动文件指针
         /// </summary>
         public void Seek(OpenFile file, int pos, SeekType type = SeekType.Begin);
+
+        /// <summary>
+        /// 获取当前用户目录下的文件和目录
+        /// </summary>
+        /// <returns></returns>
+        public IEnumerable<Entry> GetEntries();
     }
 }

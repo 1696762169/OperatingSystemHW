@@ -24,12 +24,20 @@ namespace OperatingSystemHW
     /// <summary>
     /// 文件块结构
     /// </summary>
-    internal class Sector
+    internal class Sector : IDisposable
     {
         public int Number { get; private set; }         // 文件块逻辑序号
-        public Sector(int number)
+
+        private readonly ISectorManager m_SectorManager;    // 用于资源释放的SectorManager
+        public Sector(int number, ISectorManager sectorManager)
         {
             Number = number;
+            m_SectorManager = sectorManager;
+        }
+
+        public void Dispose()
+        {
+            m_SectorManager.PutSector(this);
         }
     }
 }

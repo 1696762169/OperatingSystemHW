@@ -20,7 +20,7 @@ namespace OperatingSystemHW
     /// <summary>
     /// 内存Inode结构
     /// </summary>
-    internal class Inode
+    internal class Inode : IDisposable
     {
         //public InodeFlag flag;      // 状态标志
         //public int refCount;        // 引用计数
@@ -34,8 +34,11 @@ namespace OperatingSystemHW
         public int size;            // 文件大小，字节为单位
         public int[] address = new int[10];      // 用于文件逻辑块好和物理块好转换的基本索引表
 
-        public Inode(DiskInode diskInode)
+        private readonly int m_Index;  // Inode序号
+        private readonly IInodeManager m_InodeManager;  // 用于释放资源的InodeManager
+        public Inode(DiskInode diskInode, int index, IInodeManager inodeManager)
         {
+
             mode = diskInode.mode;
             linkCount = diskInode.linkCount;
 
@@ -47,6 +50,9 @@ namespace OperatingSystemHW
             {
                 Marshal.Copy((IntPtr)diskInode.address, address, 0, 10);
             }
+
+            m_Index = index;
+            m_InodeManager = inodeManager;
         }
 
         /// <summary>
@@ -69,6 +75,11 @@ namespace OperatingSystemHW
                 Marshal.Copy(address, 0, (IntPtr)diskInode.address, 10);
             }
             return diskInode;
+        }
+
+        public void Dispose()
+        {
+            m_InodeManager.PutInode(m_Index);
         }
     }
 }

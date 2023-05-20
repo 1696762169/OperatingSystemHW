@@ -18,13 +18,13 @@ namespace OperatingSystemHW
         public int UserId { get; private set; }         // 用户标识号
         public int GroupId { get; private set; }         // 用户组标识号
 
-        public int HomeNo { get; private set; }      // 用户信息在外存中的Inode编号
+        public int HomeNo { get; private set; }      // 用户主目录在外存中的Inode编号
         public string Home { get; private set; }     // 用户主目录
 
-        public int CurrentNo { get; private set; }   // 用户信息在外存中的Inode编号
+        public int CurrentNo { get; private set; }   // 用户当前目录在外存中的Inode编号
         public string Current { get; private set; }  // 用户当前目录
 
-        public List<Entry> CurrentEntries { get; private set; } = new(); // 当前目录下的文件目录项
+        //public List<Entry> CurrentEntries { get; private set; } = new(); // 当前目录下的文件目录项
 
         public User(DiskUser diskUser)
         {

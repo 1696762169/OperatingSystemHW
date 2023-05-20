@@ -4,6 +4,7 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
+using System.Xml.Linq;
 
 namespace OperatingSystemHW
 {
@@ -29,7 +30,7 @@ namespace OperatingSystemHW
         /// <param name="size">文件大小</param>
         /// <param name="getBlock">获取盘块的方法 一般需要使用BlockManager</param>
         /// <returns>blockNo表示盘块序号 content表示该盘块是否包含实际内容</returns>
-        public static IEnumerable<(int blockNo, bool content)> GetUsedSectors(IReadOnlyList<int> address, int size, Func<int, int[]> getBlock)
+        public static IEnumerable<(int sectorNo, bool content)> GetUsedSectors(IReadOnlyList<int> address, int size, Func<int, int[]> getBlock)
         {
             int sector = size / DiskManager.SECTOR_SIZE + (size % DiskManager.SECTOR_SIZE == 0 ? 0 : 1);
             // 一级索引
@@ -68,24 +69,34 @@ namespace OperatingSystemHW
         /// 使用BufferManager根据Inode地址项获取其使用的所有盘块
         /// </summary>
         /// <returns>blockNo表示盘块序号 content表示该盘块是否包含实际内容</returns>
-        public static IEnumerable<(int blockNo, bool content)> GetUsedSectors(IReadOnlyList<int> address, int size, ISectorManager sectorManager)
+        public static IEnumerable<(int sectorNo, bool content)> GetUsedSectors(IReadOnlyList<int> address, int size, ISectorManager sectorManager)
         {
-            return GetUsedSectors(address, size, (blockNo) =>
+            return GetUsedSectors(address, size, (sectorNo) =>
             {
                 int[] ret = new int[DiskManager.SECTOR_SIZE / sizeof(int)];
-                Sector sector = sectorManager.GetSector(blockNo);
+                using Sector sector = sectorManager.GetSector(sectorNo);
                 sectorManager.ReadArray(sector, ret, 0, ret.Length);
-                sectorManager.PutSector(sector);
                 return ret;
             });
+        }
+        /// <summary>
+        /// 使用BufferManager根据Inode地址项获取其使用的所有实际内容盘块
+        /// </summary>
+        public static IEnumerable<int> GetUsedContentSectors(IReadOnlyList<int> address, int size, ISectorManager sectorManager)
+        {
+            return GetUsedSectors(address, size, sectorManager).Where(x => x.content).Select(x => x.sectorNo);
         }
     }
 
     /// <summary>
     /// 文件路径搜索相关工具
     /// </summary>
-    internal static class DirectoryUtility
+    internal static class PathUtility
     {
-        
+        /// <summary>
+        /// 判断一个路径字符串是否为目录
+        /// </summary>
+        public static bool IsDirectory(string path) => path.EndsWith('/');
+        public static string GetFileName(string path) => path.Split('/').Last();
     }
 }
