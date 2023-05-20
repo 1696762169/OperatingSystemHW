@@ -15,20 +15,22 @@ namespace OperatingSystemHW
     {
         private readonly bool[] m_SectorUsed = new bool[DiskManager.TOTAL_SECTOR];   // 扇区使用情况表
         private int m_SearchFreeSector = DiskManager.DATA_START_SECTOR;  // 空闲扇区搜索指针
-        private int FreeSector
+        private int FreeDataSector
         {
             get => m_SuperBlockManager.Sb.FreeCount;
             set => m_SuperBlockManager.Sb.SetFreeSector(value);
         } // 空闲扇区数量
+        private readonly HashSet<int> m_SectorLocks = new(); // 扇区被进程占用情况记录
 
         private readonly bool[] m_InodeUsed = new bool[DiskManager.INODE_SIZE * DiskManager.INODE_PER_SECTOR]; // Inode使用情况表
         private int m_SearchFreeInode = 1;  // 空闲Inode搜索指针（不可尝试搜索0号Inode）
-
         private int FreeInode
         {
             get => m_SuperBlockManager.Sb.InodeCount;
             set => m_SuperBlockManager.Sb.SetFreeInode(value);
         } // 空闲Inode数量
+        private readonly HashSet<int> m_InodeLocks = new(); // Inode被进程占用情况记录
+
 
         private readonly IDiskManager m_DiskManager;    // 磁盘管理器
         private readonly ISuperBlockManager m_SuperBlockManager;    // 超级块管理器
@@ -54,9 +56,9 @@ namespace OperatingSystemHW
                 if (!m_SectorUsed[i])
                     ++freeSector;
             int freeInode = m_InodeUsed.Count(t => !t);
-            if (freeSector != FreeSector)
+            if (freeSector != FreeDataSector)
             {
-                FreeSector = freeSector;
+                FreeDataSector = freeSector;
                 m_SuperBlockManager.UpdateSuperBlock();
                 Console.WriteLine($"空闲扇区数量不正确，已修正为{freeSector}");
             }
@@ -78,17 +80,18 @@ namespace OperatingSystemHW
         }
 
         #region 数据操作公共接口
-        public IEnumerable<Sector> GetFreeSector(int count)
+        public IEnumerable<Sector> GetEmptySector(int count)
         {
             for (int i = 0; i < count; ++i)
-                yield return GetFreeSector();
+                yield return GetEmptySector();
         }
 
-        public Sector GetFreeSector()
+        public Sector GetEmptySector()
         {
-            if (FreeSector <= 0)
+            if (FreeDataSector <= 0)
                 throw new Exception("磁盘已满");
-            while (m_SectorUsed[m_SearchFreeSector])
+            // 查找一个磁盘中未使用 且 未被其它进程占用的扇区
+            while (m_SectorUsed[m_SearchFreeSector] || m_SectorLocks.Contains(m_SearchFreeSector))
             {
                 ++m_SearchFreeSector;
                 if (m_SearchFreeSector >= m_SectorUsed.Length)
@@ -99,25 +102,15 @@ namespace OperatingSystemHW
 
         public Sector GetSector(int blockNo)
         {
-            if (m_SectorUsed[blockNo])
+            if (m_SectorLocks.Contains(blockNo))
                 throw new Exception($"扇区 {blockNo} 已被使用");
-            m_SectorUsed[blockNo] = true;
-            if (blockNo >= DiskManager.DATA_START_SECTOR)
-            {
-                --FreeSector;
-                m_SuperBlockManager.UpdateSuperBlock();
-            }
+            m_SectorLocks.Add(blockNo);
             return new Sector(blockNo);
         }
 
         public void PutSector(Sector sector)
         {
-            if (sector.Number >= DiskManager.DATA_START_SECTOR && m_SectorUsed[sector.Number])
-            {
-                ++FreeSector;
-                m_SuperBlockManager.UpdateSuperBlock();
-            }
-            m_SectorUsed[sector.Number] = false;
+            m_SectorLocks.Remove(sector.Number);
         }
 
         public void ReadBytes(Sector sector, byte[] buffer, int size = DiskManager.SECTOR_SIZE, int position = 0)
@@ -133,6 +126,7 @@ namespace OperatingSystemHW
             EnsureSectorUsed(sector);
             if (position + size > DiskManager.SECTOR_SIZE)
                 throw new ArgumentOutOfRangeException($"写入范围（position：{position} + size：{size}）超过扇区大小");
+            OccupySector(sector.Number);
             m_DiskManager.WriteBytes(buffer, DiskManager.SECTOR_SIZE * sector.Number + position, size);
         }
 
@@ -149,6 +143,7 @@ namespace OperatingSystemHW
             EnsureSectorUsed(sector);
             if (position + Marshal.SizeOf<T>() > DiskManager.SECTOR_SIZE)
                 throw new ArgumentOutOfRangeException($"写入范围（position：{position} + sizeof({typeof(T).Name})：{Marshal.SizeOf<T>()}）超过扇区大小");
+            OccupySector(sector.Number);
             m_DiskManager.Write(DiskManager.SECTOR_SIZE * sector.Number + position, ref value);
         }
 
@@ -167,16 +162,29 @@ namespace OperatingSystemHW
             if (position + count * Marshal.SizeOf<T>() > DiskManager.SECTOR_SIZE)
                 throw new ArgumentOutOfRangeException(
                     $"写入范围（position：{position} + count：{count} * sizeof({typeof(T).Name})：{Marshal.SizeOf<T>()}）超过扇区大小");
+            OccupySector(sector.Number);
             m_DiskManager.WriteArray(DiskManager.SECTOR_SIZE * sector.Number + position, array, offset, count);
         }
+
+        public void ClearSector(params Sector[] sectors)
+        {
+            // 先检查使用权限
+            foreach (Sector sector in sectors)
+                EnsureSectorUsed(sector);
+            // 释放所有扇区
+            foreach (Sector sector in sectors)
+                FreeSector(sector.Number);
+        }
+
         #endregion
 
         #region Inode操作公共接口
-        public Inode GetFreeInode()
+        public Inode GetEmptyInode()
         {
             if (FreeInode <= 0)
                 throw new Exception("没有空闲的Inode");
-            while (m_InodeUsed[m_SearchFreeInode])
+            // 查找一个磁盘中未使用 且 未被其它进程占用的Inode
+            while (m_InodeUsed[m_SearchFreeInode] || m_InodeLocks.Contains(m_SearchFreeInode))
             {
                 ++m_SearchFreeInode;
                 if (m_SearchFreeInode >= m_InodeUsed.Length)
@@ -187,11 +195,9 @@ namespace OperatingSystemHW
 
         public Inode GetInode(int inodeNo)
         {
-            if (m_InodeUsed[inodeNo])
+            if (m_InodeLocks.Contains(m_SearchFreeInode))
                 throw new Exception($"Inode {inodeNo} 已被使用");
-            m_InodeUsed[inodeNo] = true;
-            --FreeInode;
-            m_SuperBlockManager.UpdateSuperBlock();
+            m_InodeLocks.Add(inodeNo);
 
             ReadDiskInode(inodeNo, out DiskInode diskInode);
             return new Inode(diskInode);
@@ -199,14 +205,29 @@ namespace OperatingSystemHW
 
         public void PutInode(int inodeNo)
         {
-            if (!m_InodeUsed[inodeNo]) return;
-            ++FreeInode;
-            m_SuperBlockManager.UpdateSuperBlock();
-            m_InodeUsed[inodeNo] = false;
+            m_InodeLocks.Remove(inodeNo);
         }
 
         public void UpdateInode(int inodeNo, Inode inode)
         {
+            // 检查Inode使用权限
+            EnsureInodeUsed(inodeNo);
+            // 清除uid为0的Inode占用
+            if (inode.uid == 0 && m_InodeUsed[inodeNo])
+            {
+                ++FreeInode;
+                m_InodeUsed[inodeNo] = false;
+                m_SuperBlockManager.UpdateSuperBlock();
+                return;
+            }
+
+            // 写入扇区内容
+            if (!m_InodeUsed[inodeNo])
+            {
+                --FreeInode;
+                m_InodeUsed[inodeNo] = true;
+                m_SuperBlockManager.UpdateSuperBlock();
+            }
             DiskInode diskInode = inode.ToDiskInode();
             WriteDiskInode(inodeNo, ref diskInode);
         }
@@ -282,8 +303,33 @@ namespace OperatingSystemHW
         // 判断一个扇区是否可用
         private void EnsureSectorUsed(Sector sector)
         {
-            if (!m_SectorUsed[sector.Number])
+            if (!m_SectorLocks.Contains(sector.Number))
                 throw new Exception($"扇区 {sector.Number} 未被使用");
+        }
+        // 判断一个Inode是否可用
+        private void EnsureInodeUsed(int inodeNo)
+        {
+            if (!m_InodeLocks.Contains(inodeNo))
+                throw new Exception($"Inode {inodeNo} 未被使用");
+        }
+
+        // 占用扇区空间
+        private void OccupySector(int sectorNo)
+        {
+            if (m_SectorUsed[sectorNo])
+                return;
+            m_SectorUsed[sectorNo] = true;
+            --FreeDataSector;
+            m_SuperBlockManager.UpdateSuperBlock();
+        }
+        // 释放扇区空间
+        private void FreeSector(int sectorNo)
+        {
+            if (!m_SectorUsed[sectorNo])
+                return;
+            m_SectorUsed[sectorNo] = false;
+            ++FreeDataSector;
+            m_SuperBlockManager.UpdateSuperBlock();
         }
 
         // 格式化硬盘

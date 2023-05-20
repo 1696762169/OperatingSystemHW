@@ -15,11 +15,11 @@ namespace OperatingSystemHW
         /// 获取空闲盘块的控制权
         /// </summary>
         /// <param name="count">需要获取的盘块数</param>
-        public IEnumerable<Sector> GetFreeSector(int count);
+        public IEnumerable<Sector> GetEmptySector(int count);
         /// <summary>
         /// 获取一个空闲盘块的控制权
         /// </summary>
-        public Sector GetFreeSector();
+        public Sector GetEmptySector();
 
         /// <summary>
         /// 获取一个指定盘块的控制权
@@ -67,5 +67,11 @@ namespace OperatingSystemHW
         /// <param name="count">写入元素数量</param>
         /// <param name="position"></param>
         public void WriteArray<T>(Sector sector, T[] array, int offset, int count, int position = 0) where T : unmanaged;
+
+        /// <summary>
+        /// 清除扇区中的数据
+        /// </summary>
+        /// <param name="sectors"></param>
+        public void ClearSector(params Sector[] sectors);
     }
 }

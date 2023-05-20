@@ -14,7 +14,7 @@ namespace OperatingSystemHW
         /// <summary>
         /// 获取一个空闲Inode的控制权
         /// </summary>
-        public Inode GetFreeInode();
+        public Inode GetEmptyInode();
         /// <summary>
         /// 获取一个Inode的控制权
         /// </summary>
