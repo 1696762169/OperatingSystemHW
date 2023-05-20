@@ -15,6 +15,10 @@ namespace OperatingSystemHW
             FileManager fileManager = new(blockManager, blockManager, fileSystem);
 
             User super = fileSystem.GetUser(0);
+
+            fileManager.CreateFile("/a.txt");
+            fileManager.CreateFile("/b.txt");
+            fileManager.CreateFile("/c.txt");
             diskManager.Dispose();
         }
     }

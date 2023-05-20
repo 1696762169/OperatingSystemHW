@@ -32,11 +32,11 @@ namespace OperatingSystemHW
         public short gid;           // 文件所有者的组标识数
 
         public int size;            // 文件大小，字节为单位
-        public int[] address = new int[10];      // 用于文件逻辑块好和物理块好转换的基本索引表
+        public int[] address = new int[10];      // 用于文件逻辑块号和物理块号转换的基本索引表
 
-        private readonly int m_Index;  // Inode序号
+        public readonly int number;  // Inode序号
         private readonly IInodeManager m_InodeManager;  // 用于释放资源的InodeManager
-        public Inode(DiskInode diskInode, int index, IInodeManager inodeManager)
+        public Inode(DiskInode diskInode, int number, IInodeManager inodeManager)
         {
 
             mode = diskInode.mode;
@@ -51,7 +51,7 @@ namespace OperatingSystemHW
                 Marshal.Copy((IntPtr)diskInode.address, address, 0, 10);
             }
 
-            m_Index = index;
+            this.number = number;
             m_InodeManager = inodeManager;
         }
 
@@ -79,7 +79,7 @@ namespace OperatingSystemHW
 
         public void Dispose()
         {
-            m_InodeManager.PutInode(m_Index);
+            m_InodeManager.PutInode(number);
         }
     }
 }

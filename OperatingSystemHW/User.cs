@@ -68,7 +68,7 @@ namespace OperatingSystemHW
             return diskUser;
         }
 
-        public void ChangeDirectory(Entry)
+        public void ChangeDirectory(Entry directory)
         {
             
         }

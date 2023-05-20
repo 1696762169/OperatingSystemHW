@@ -15,8 +15,8 @@ namespace OperatingSystemHW
     internal class FileManager : IFileManager
     {
         private readonly ISectorManager m_SectorManager;    // 文件块管理器
-        private readonly IInodeManager m_InodeManager;    // Inode管理器
-        private readonly IUserManager m_UserManager;      // 用户管理器
+        private readonly IInodeManager m_InodeManager;      // Inode管理器
+        private readonly IUserManager m_UserManager;        // 用户管理器
 
         public FileManager(ISectorManager sectorManager, IInodeManager inodeManager, IUserManager userManager)
         {
@@ -27,16 +27,21 @@ namespace OperatingSystemHW
 
         public OpenFile Open(string path)
         {
-            throw new NotImplementedException();
+            Inode inode = m_InodeManager.GetInode(GetFileInode(path, m_UserManager.Current));
+            // 打开文件即申请Inode使用权
+            return new OpenFile(inode);
         }
 
         public void Close(OpenFile file)
         {
-            throw new NotImplementedException();
+            // 关闭打开文件即归还Inode使用权
+            m_InodeManager.PutInode(file.inode.number);
         }
 
         public void CreateFile(string path)
         {
+            if (PathUtility.IsDirectory(path))
+                throw new ArgumentException("路径不能是目录：" + path);
             // 获取目标文件夹
             using Inode dirInode = m_InodeManager.GetInode(GetDirInode(path, m_UserManager.Current));
 
@@ -53,6 +58,9 @@ namespace OperatingSystemHW
             
             // 获取一个空闲Inode
             using Inode inode = m_InodeManager.GetEmptyInode();
+            // 写入新的文件目录项
+            AddEntry(dirInode, new Entry(inode.number, PathUtility.GetFileName(path)));
+
         }
 
         public void Delete(string path)
@@ -60,19 +68,50 @@ namespace OperatingSystemHW
             throw new NotImplementedException();
         }
 
-        public void Read(OpenFile file, byte[] buffer, int size)
+        public void ReadBytes(OpenFile file, byte[] buffer, int size)
         {
             throw new NotImplementedException();
         }
 
-        public void Write(OpenFile file, byte[] buffer, int size)
+        public void WriteBytes(OpenFile file, byte[] buffer, int size)
         {
             throw new NotImplementedException();
+        }
+
+        public void ReadStruct<T>(OpenFile file, out T value) where T : unmanaged
+        {
+            // 读取结构体只能在单个扇区中读取
+            using Sector sector = m_SectorManager.GetSector(Utility.GetUsedSector(file.inode.address, file.pointer, m_SectorManager));
+            m_SectorManager.ReadStruct(sector, out value, file.pointer % DiskManager.SECTOR_SIZE);
+            file.pointer += Marshal.SizeOf<T>();
+        }
+
+        public void WriteStruct<T>(OpenFile file, ref T value) where T : unmanaged
+        {
+            // 写入位置超出文件范围且刚好在扇区末尾时 需要一个新扇区
+            int sectorNo = file.pointer != file.inode.size && file.pointer % DiskManager.SECTOR_SIZE == 0 ? 
+                Utility.GetUsedSector(file.inode.address, file.pointer, m_SectorManager) : 
+                m_SectorManager.GetEmptySector();
+            // 写入结构体只能写入在单个扇区中
+            using Sector sector = m_SectorManager.GetSector(sectorNo);
+            m_SectorManager.WriteStruct(sector, ref value, file.pointer % DiskManager.SECTOR_SIZE);
+            // 更新文件指针和文件大小
+            file.pointer += Marshal.SizeOf<T>();
+            file.inode.size = Math.Max(file.inode.size, file.pointer);
         }
 
         public void Seek(OpenFile file, int pos, SeekType type = SeekType.Begin)
         {
-            throw new NotImplementedException();
+            int target = type switch
+            {
+                SeekType.Begin => pos,
+                SeekType.Current => file.pointer + pos,
+                SeekType.End => file.inode.size + pos,
+                _ => throw new ArgumentOutOfRangeException(nameof(type), type, null)
+            };
+            if (target < 0 || target > file.inode.size)
+                throw new ArgumentOutOfRangeException(nameof(pos), pos, "文件指针超出文件范围");
+            file.pointer = target;
         }
 
         public IEnumerable<Entry> GetEntries()
@@ -159,6 +198,17 @@ namespace OperatingSystemHW
                     yield return new Entry(buffer[i]);
                 size -= readNumber;
             }
+        }
+        // 添加目录项
+        private void AddEntry(Inode dirInode, Entry entry)
+        {
+            OpenFile file = new(dirInode);
+            Seek(file, 0, SeekType.End);
+            DirectoryEntry de = entry.ToDirectoryEntry();
+            WriteStruct(file, ref de);
+            // 更新Inode
+            file.inode.uid = (short)m_UserManager.Current.UserId;
+            m_InodeManager.UpdateInode(file.inode.number, file.inode);
         }
         #endregion
     }

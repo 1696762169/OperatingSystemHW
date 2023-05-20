@@ -27,7 +27,7 @@ namespace OperatingSystemHW
         private int m_SearchFreeInode = 1;  // 空闲Inode搜索指针（不可尝试搜索0号Inode）
         private int FreeInode
         {
-            get => m_SuperBlockManager.Sb.InodeCount;
+            get => m_SuperBlockManager.Sb.FreeInode;
             set => m_SuperBlockManager.Sb.SetFreeInode(value);
         } // 空闲Inode数量
         private readonly HashSet<int> m_InodeLocks = new(); // Inode被进程占用情况记录
@@ -81,13 +81,13 @@ namespace OperatingSystemHW
         }
 
         #region 数据操作公共接口
-        public IEnumerable<Sector> GetEmptySector(int count)
+        public IEnumerable<int> GetEmptySector(int count)
         {
             for (int i = 0; i < count; ++i)
                 yield return GetEmptySector();
         }
 
-        public Sector GetEmptySector()
+        public int GetEmptySector()
         {
             if (FreeDataSector <= 0)
                 throw new Exception("磁盘已满");
@@ -98,7 +98,7 @@ namespace OperatingSystemHW
                 if (m_SearchFreeSector >= m_SectorUsed.Length)
                     m_SearchFreeSector = DiskManager.DATA_START_SECTOR;
             }
-            return GetSector(m_SearchFreeSector);
+            return m_SearchFreeSector;
         }
 
         public Sector GetSector(int sectorNo)
@@ -111,7 +111,7 @@ namespace OperatingSystemHW
 
         public void PutSector(Sector sector)
         {
-            m_SectorLocks.Remove(sector.Number);
+            m_SectorLocks.Remove(sector.number);
         }
 
         public void ReadBytes(Sector sector, byte[] buffer, int size = DiskManager.SECTOR_SIZE, int position = 0)
@@ -119,7 +119,7 @@ namespace OperatingSystemHW
             EnsureSectorUsed(sector);
             if (size + position > DiskManager.SECTOR_SIZE)
                 throw new ArgumentOutOfRangeException($"读取范围（position：{position} + size：{size}）超过扇区大小");
-            m_DiskManager.ReadBytes(buffer, DiskManager.SECTOR_SIZE * sector.Number + position, size);
+            m_DiskManager.ReadBytes(buffer, DiskManager.SECTOR_SIZE * sector.number + position, size);
         }
 
         public void WriteBytes(Sector sector, byte[] buffer, int size = DiskManager.SECTOR_SIZE, int position = 0)
@@ -127,8 +127,8 @@ namespace OperatingSystemHW
             EnsureSectorUsed(sector);
             if (position + size > DiskManager.SECTOR_SIZE)
                 throw new ArgumentOutOfRangeException($"写入范围（position：{position} + size：{size}）超过扇区大小");
-            OccupySector(sector.Number);
-            m_DiskManager.WriteBytes(buffer, DiskManager.SECTOR_SIZE * sector.Number + position, size);
+            OccupySector(sector.number);
+            m_DiskManager.WriteBytes(buffer, DiskManager.SECTOR_SIZE * sector.number + position, size);
         }
 
         public void ReadStruct<T>(Sector sector, out T value, int position = 0) where T : unmanaged
@@ -136,7 +136,7 @@ namespace OperatingSystemHW
             EnsureSectorUsed(sector);
             if (position + Marshal.SizeOf<T>() > DiskManager.SECTOR_SIZE)
                 throw new ArgumentOutOfRangeException($"读取范围（position：{position} + sizeof({typeof(T).Name})：{Marshal.SizeOf<T>()}）超过扇区大小");
-            m_DiskManager.Read(DiskManager.SECTOR_SIZE * sector.Number + position, out value);
+            m_DiskManager.Read(DiskManager.SECTOR_SIZE * sector.number + position, out value);
         }
 
         public void WriteStruct<T>(Sector sector, ref T value, int position = 0) where T : unmanaged
@@ -144,8 +144,8 @@ namespace OperatingSystemHW
             EnsureSectorUsed(sector);
             if (position + Marshal.SizeOf<T>() > DiskManager.SECTOR_SIZE)
                 throw new ArgumentOutOfRangeException($"写入范围（position：{position} + sizeof({typeof(T).Name})：{Marshal.SizeOf<T>()}）超过扇区大小");
-            OccupySector(sector.Number);
-            m_DiskManager.Write(DiskManager.SECTOR_SIZE * sector.Number + position, ref value);
+            OccupySector(sector.number);
+            m_DiskManager.Write(DiskManager.SECTOR_SIZE * sector.number + position, ref value);
         }
 
         public void ReadArray<T>(Sector sector, T[] array, int offset, int count, int position = 0) where T : unmanaged
@@ -154,7 +154,7 @@ namespace OperatingSystemHW
             if (position + count * Marshal.SizeOf<T>() > DiskManager.SECTOR_SIZE)
                 throw new ArgumentOutOfRangeException(
                     $"读取范围（position：{position} + count：{count} * sizeof({typeof(T).Name})：{Marshal.SizeOf<T>()}）超过扇区大小");
-            m_DiskManager.ReadArray(DiskManager.SECTOR_SIZE * sector.Number + position, array, offset, count);
+            m_DiskManager.ReadArray(DiskManager.SECTOR_SIZE * sector.number + position, array, offset, count);
         }
 
         public void WriteArray<T>(Sector sector, T[] array, int offset, int count, int position = 0) where T : unmanaged
@@ -163,8 +163,8 @@ namespace OperatingSystemHW
             if (position + count * Marshal.SizeOf<T>() > DiskManager.SECTOR_SIZE)
                 throw new ArgumentOutOfRangeException(
                     $"写入范围（position：{position} + count：{count} * sizeof({typeof(T).Name})：{Marshal.SizeOf<T>()}）超过扇区大小");
-            OccupySector(sector.Number);
-            m_DiskManager.WriteArray(DiskManager.SECTOR_SIZE * sector.Number + position, array, offset, count);
+            OccupySector(sector.number);
+            m_DiskManager.WriteArray(DiskManager.SECTOR_SIZE * sector.number + position, array, offset, count);
         }
 
         public void ClearSector(params Sector[] sectors)
@@ -174,7 +174,7 @@ namespace OperatingSystemHW
                 EnsureSectorUsed(sector);
             // 释放所有扇区
             foreach (Sector sector in sectors)
-                FreeSector(sector.Number);
+                FreeSector(sector.number);
         }
 
         #endregion
@@ -304,8 +304,8 @@ namespace OperatingSystemHW
         // 判断一个扇区是否可用
         private void EnsureSectorUsed(Sector sector)
         {
-            if (!m_SectorLocks.Contains(sector.Number))
-                throw new Exception($"扇区 {sector.Number} 未被使用");
+            if (!m_SectorLocks.Contains(sector.number))
+                throw new Exception($"扇区 {sector.number} 未被使用");
         }
         // 判断一个Inode是否可用
         private void EnsureInodeUsed(int inodeNo)

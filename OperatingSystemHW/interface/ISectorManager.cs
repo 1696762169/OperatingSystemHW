@@ -15,11 +15,11 @@ namespace OperatingSystemHW
         /// 获取空闲盘块的控制权
         /// </summary>
         /// <param name="count">需要获取的盘块数</param>
-        public IEnumerable<Sector> GetEmptySector(int count);
+        public IEnumerable<int> GetEmptySector(int count);
         /// <summary>
         /// 获取一个空闲盘块的控制权
         /// </summary>
-        public Sector GetEmptySector();
+        public int GetEmptySector();
 
         /// <summary>
         /// 获取一个指定盘块的控制权

@@ -27,6 +27,11 @@ namespace OperatingSystemHW
         public int inodeNo;
         public string name;
 
+        public Entry(int inodeNo, string name)
+        {
+            this.inodeNo = inodeNo;
+            this.name = name;
+        }
         public Entry(DirectoryEntry entry)
         {
             inodeNo = entry.inodeNo;

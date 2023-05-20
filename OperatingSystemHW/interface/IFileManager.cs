@@ -34,13 +34,21 @@ namespace OperatingSystemHW
         public void Delete(string path);
 
         /// <summary>
-        /// 读取文件
+        /// 从文件读取二进制数据
         /// </summary>
-        public void Read(OpenFile file, byte[] buffer, int size);
+        public void ReadBytes(OpenFile file, byte[] buffer, int size);
         /// <summary>
-        /// 写入文件
+        /// 写入二进制数据到文件
         /// </summary>
-        public void Write(OpenFile file, byte[] buffer, int size);
+        public void WriteBytes(OpenFile file, byte[] buffer, int size);
+        /// <summary>
+        /// 从文件读取结构体
+        /// </summary>
+        public void ReadStruct<T>(OpenFile file, out T value) where T : unmanaged;
+        /// <summary>
+        /// 写入结构体到文件
+        /// </summary>
+        public void WriteStruct<T>(OpenFile file, ref T value)where T : unmanaged;
 
         /// <summary>
         /// 移动文件指针
