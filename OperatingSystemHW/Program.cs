@@ -16,24 +16,8 @@ namespace OperatingSystemHW
             BlockManager blockManager = new(diskManager, fileSystem);
             FileManager fileManager = new(blockManager, blockManager, fileSystem);
 
-            User super = fileSystem.GetUser(0);
-
-            foreach (Entry entry in fileManager.GetEntries())
-            {
-                System.Console.WriteLine(entry.name);
-            }
-            fileManager.CreateFile("/a.txt");
-            //fileManager.CreateFile("/b.txt");
-            //fileManager.CreateFile("/c.txt");
-            foreach (Entry entry in fileManager.GetEntries())
-            {
-                System.Console.WriteLine(entry.name);
-            }
-            fileManager.DeleteFile("/a.txt");
-            foreach (Entry entry in fileManager.GetEntries())
-            {
-                System.Console.WriteLine(entry.name);
-            }
+            View view = new(fileSystem, fileManager);
+            view.Start();
         }
     }
 }
