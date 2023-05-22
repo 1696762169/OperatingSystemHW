@@ -81,7 +81,7 @@ namespace OperatingSystemHW
         public void ReadStruct<T>(OpenFile file, out T value) where T : unmanaged
         {
             // 读取结构体只能在单个扇区中读取
-            using Sector sector = m_SectorManager.GetSector(Utility.GetUsedSector(file.inode.address, file.pointer, m_SectorManager));
+            using Sector sector = m_SectorManager.GetSector(file.inode.GetUsedSector(file.pointer, m_SectorManager));
             m_SectorManager.ReadStruct(sector, out value, file.pointer % DiskManager.SECTOR_SIZE);
             file.pointer += Marshal.SizeOf<T>();
         }
@@ -89,8 +89,8 @@ namespace OperatingSystemHW
         public void WriteStruct<T>(OpenFile file, ref T value) where T : unmanaged
         {
             // 写入位置超出文件范围且刚好在扇区末尾时 需要一个新扇区
-            int sectorNo = file.pointer != file.inode.size && file.pointer % DiskManager.SECTOR_SIZE == 0 ? 
-                Utility.GetUsedSector(file.inode.address, file.pointer, m_SectorManager) : 
+            int sectorNo = file.pointer != file.inode.size && file.pointer % DiskManager.SECTOR_SIZE == 0 ?
+                file.inode.GetUsedSector(file.pointer, m_SectorManager) : 
                 m_SectorManager.GetEmptySector();
             // 写入结构体只能写入在单个扇区中
             using Sector sector = m_SectorManager.GetSector(sectorNo);
@@ -186,7 +186,7 @@ namespace OperatingSystemHW
         {
             int size = dirInode.size;
             DirectoryEntry[] buffer = new DirectoryEntry[DiskManager.SECTOR_SIZE / Marshal.SizeOf<DirectoryEntry>()];
-            foreach (int sectorNo in Utility.GetUsedContentSectors(dirInode.address, dirInode.size, m_SectorManager))
+            foreach (int sectorNo in dirInode.GetUsedContentSectors(m_SectorManager))
             {
                 // 获取扇区权限
                 using Sector sector = m_SectorManager.GetSector(sectorNo);

@@ -28,6 +28,11 @@ namespace OperatingSystemHW
 
         public const int SECTOR_SIZE = 512; // 扇区大小
         public const int TOTAL_SECTOR = DATA_SIZE + DATA_START_SECTOR;   // 总扇区数
+
+        public const int INT_PER_SECTOR = SECTOR_SIZE / sizeof(int);
+        public const int SMALL_FILE_SIZE = SECTOR_SIZE * 6;  // 小文件最大字节数
+        public const int LARGE_FILE_SIZE = SECTOR_SIZE * (6 + INT_PER_SECTOR * 2);   // 大文件最大字节数
+        public const int HUGE_FILE_SIZE = SECTOR_SIZE * (6 + INT_PER_SECTOR * (2 + INT_PER_SECTOR * 2)); // 巨大文件最大字节数
         #endregion
 
         private readonly MemoryMappedFile m_MappedFile;    // 内存映射文件
@@ -102,5 +107,43 @@ namespace OperatingSystemHW
         {
             accessor.WriteArray(position, array, offset, count);
         }
+
+        /// <summary>
+        /// 获取一个文件需要使用的所有扇区数量
+        /// </summary>
+        /// <param name="size">文件大小 单位：字节</param>
+        public static int GetAddressSectorCount(int size)
+        {
+            switch (size)
+            {
+            case < 0:
+                throw new ArgumentException("文件大小不能为负数");
+            case > HUGE_FILE_SIZE:
+                throw new ArgumentException($"文件（{size}字节）过大");
+            }
+            // 分段计算索引盘块数
+            const int PAGE_SIZE = INT_PER_SECTOR * SECTOR_SIZE;
+            switch (size)
+            {
+            case <= SMALL_FILE_SIZE:
+                return 0;
+            case <= LARGE_FILE_SIZE:
+                size -= SMALL_FILE_SIZE;
+                return size >= PAGE_SIZE ? 1 : 2;
+            default:
+                size -= LARGE_FILE_SIZE;
+                return 2 + (size >= INT_PER_SECTOR * PAGE_SIZE ? 1 : 2) + (size + PAGE_SIZE - 1) / PAGE_SIZE;
+            }
+        }
+        /// <summary>
+        /// 获取一个文件需要使用的内容扇区数量
+        /// </summary>
+        /// <param name="size">文件大小 单位：字节</param>
+        public static int GetContentSectorCount(int size) => (size + SECTOR_SIZE - 1) / SECTOR_SIZE;
+        /// <summary>
+        /// 获取一个文件需要使用的内容扇区数量
+        /// </summary>
+        /// <param name="size">文件大小 单位：字节</param>
+        public static int GetSectorCount(int size) => GetAddressSectorCount(size) + GetContentSectorCount(size);
     }
 }

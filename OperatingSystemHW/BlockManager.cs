@@ -81,12 +81,6 @@ namespace OperatingSystemHW
         }
 
         #region 数据操作公共接口
-        public IEnumerable<int> GetEmptySector(int count)
-        {
-            for (int i = 0; i < count; ++i)
-                yield return GetEmptySector();
-        }
-
         public int GetEmptySector()
         {
             if (FreeDataSector <= 0)
