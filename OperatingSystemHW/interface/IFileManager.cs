@@ -36,11 +36,11 @@ namespace OperatingSystemHW
         /// <summary>
         /// 从文件读取二进制数据
         /// </summary>
-        public void ReadBytes(OpenFile file, byte[] buffer, int size);
+        public void ReadBytes(OpenFile file, byte[] data);
         /// <summary>
         /// 写入二进制数据到文件
         /// </summary>
-        public void WriteBytes(OpenFile file, byte[] buffer, int size);
+        public void WriteBytes(OpenFile file, byte[] data);
         /// <summary>
         /// 从文件读取结构体
         /// </summary>

@@ -67,22 +67,104 @@ namespace OperatingSystemHW
             throw new NotImplementedException();
         }
 
-        public void ReadBytes(OpenFile file, byte[] buffer, int size)
+        public void ReadBytes(OpenFile file, byte[] data)
         {
-            throw new NotImplementedException();
+            if (data.Length == 0)
+                return;
+            List<Sector> sectors = ReadPrepare(file, data.Length);
+            const int SECTOR_SIZE = DiskManager.SECTOR_SIZE;
+            byte[] buffer = new byte[SECTOR_SIZE];
+            try
+            {
+                // 读入第一块
+                int index = 0;
+                if (sectors.Count > 0)
+                {
+                    int readCount = Math.Min(SECTOR_SIZE - file.pointer % SECTOR_SIZE, data.Length);
+                    m_SectorManager.ReadBytes(sectors[0], data, readCount, file.pointer % SECTOR_SIZE);
+                    index += readCount;
+                    file.pointer += readCount;
+                }
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine($"读取二进制数据失败：\n{e.Message}");
+                throw;
+            }
+            finally
+            {
+                sectors.ForEach(sector => sector.Dispose());
+            }
         }
 
-        public void WriteBytes(OpenFile file, byte[] buffer, int size)
+        public void WriteBytes(OpenFile file, byte[] data)
         {
-            throw new NotImplementedException();
+            if (data.Length == 0)
+                return;
+            List<Sector> sectors = WritePrepare(file, data.Length);
+            const int SECTOR_SIZE = DiskManager.SECTOR_SIZE;
+            byte[] buffer = new byte[SECTOR_SIZE];
+            try
+            {
+                // 写入第一块
+                int index = 0;
+                if (sectors.Count > 0)
+                {
+                    // 此处考虑了仅写入一块且两头都写不满的情况
+                    int writeCount = Math.Min(SECTOR_SIZE - file.pointer % SECTOR_SIZE, data.Length);
+                    m_SectorManager.ReadBytes(sectors[0], buffer);
+                    Array.Copy(data, index, buffer, file.pointer % SECTOR_SIZE, writeCount);
+                    m_SectorManager.WriteBytes(sectors[0], buffer);
+                    index += writeCount;
+                    file.pointer += writeCount;
+                }
+                // 写入中间块
+                for (int i = 1; i < sectors.Count - 1; ++i)
+                {
+                    Array.Copy(data, index, buffer, 0, SECTOR_SIZE);
+                    m_SectorManager.WriteBytes(sectors[i], buffer);
+                    index += SECTOR_SIZE;
+                    file.pointer += SECTOR_SIZE;
+                }
+                // 写入最后一块
+                if (sectors.Count > 1)
+                {
+                    int writeCount = data.Length - index;
+                    m_SectorManager.ReadBytes(sectors[^1], buffer);
+                    Array.Copy(data, index, buffer, 0, writeCount);
+                    m_SectorManager.WriteBytes(sectors[^1], buffer);
+                    file.pointer += writeCount;
+                }
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine($"写入二进制数据失败：\n{e.Message}");
+                throw;
+            }
+            finally
+            {
+                sectors.ForEach(sector => sector.Dispose());
+            }
         }
 
         public void ReadStruct<T>(OpenFile file, out T value) where T : unmanaged
         {
-            // 读取结构体只能在单个扇区中读取
-            using Sector sector = m_SectorManager.GetSector(file.inode.GetUsedSector(file.pointer, m_SectorManager));
-            m_SectorManager.ReadStruct(sector, out value, file.pointer % DiskManager.SECTOR_SIZE);
-            file.pointer += Marshal.SizeOf<T>();
+            List<Sector> sectors = ReadPrepare(file, Marshal.SizeOf<T>());
+            try
+            {
+                // 读取结构体只能在单个扇区中读取
+                m_SectorManager.ReadStruct(sectors[0], out value, file.pointer % DiskManager.SECTOR_SIZE);
+                file.pointer += Marshal.SizeOf<T>();
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine($"读取结构体失败：\n{e.Message}");
+                throw;
+            }
+            finally
+            {
+                sectors.ForEach(sector => sector.Dispose());
+            }
         }
 
         public void WriteStruct<T>(OpenFile file, ref T value) where T : unmanaged
@@ -127,7 +209,31 @@ namespace OperatingSystemHW
 
         #region 公共实现
         /// <summary>
-        /// 申请需要写入内容得扇区权限 并更新文件索引与大小
+        /// 申请需要读取内容得的扇区权限
+        /// </summary>
+        /// <param name="file">打开文件结构</param>
+        /// <param name="readSize">读取内容大小</param>
+        private List<Sector> ReadPrepare(OpenFile file, int readSize)
+        {
+            if (file.pointer + readSize > file.inode.size)
+                throw new ArgumentOutOfRangeException(nameof(readSize), readSize, "读取大小超出文件范围");
+            // 申请需要读取的内容权限
+            List<Sector> contentSectors = new();
+            try
+            {
+                contentSectors.AddRange(file.inode.GetUsedContentSectors(m_SectorManager, file.pointer, readSize)
+                    .Select(m_SectorManager.GetSector));
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine($"申请读取内容扇区失败：{e.Message}");
+                contentSectors.ForEach(sector => sector.Dispose());
+            }
+            return contentSectors;
+        }
+
+        /// <summary>
+        /// 申请需要写入内容的扇区权限 并更新文件索引与大小
         /// </summary>
         /// <param name="file">打开文件结构</param>
         /// <param name="writeSize">写入内容大小</param>
