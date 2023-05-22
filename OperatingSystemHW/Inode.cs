@@ -158,33 +158,90 @@ namespace OperatingSystemHW
         /// <param name="curSize">新文件大小 单位：字节</param>
         /// <param name="sectorManager">需要使用的扇区管理器</param>
         /// <param name="newSectors">已经申请到使用权限的新扇区</param>
-        /// <param name="addressSectors">已经申请到使用权限的原索引扇区</param>
-        /// <param name="contentSectors">已经申请到使用权限的待写入内容扇区</param>
+        /// <param name="addressSectors">已经申请到使用权限的所有原索引扇区</param>
         /// <returns>按序排列的内容扇区</returns>
-        public List<Sector> UpdateAddress(int curSize, int prevSize, ISectorManager sectorManager, 
-            List<Sector> newSectors, List<Sector> addressSectors, List<Sector> contentSectors)
+        public List<Sector> UpdateAddress(int curSize, int prevSize, ISectorManager sectorManager, List<Sector> newSectors, List<Sector> addressSectors)
         {
             // 检查扇区数量
-            int newSectorCount = DiskManager.GetSectorCount(curSize) - DiskManager.GetSectorCount(prevSize);
-            if (newSectors.Count != newSectorCount)
-                throw new ArgumentException($"新扇区数量不匹配，需要 {newSectorCount} 个，实际提供 {newSectors.Count} 个");
-            int addressSectorCount = DiskManager.GetAddressSectorCount(prevSize);
-            if (addressSectors.Count != addressSectorCount)
-                throw new ArgumentException($"原索引扇区数量不匹配，需要 {addressSectorCount} 个，实际提供 {addressSectors.Count} 个");
-            int contentSectorCount = DiskManager.GetContentSectorCount(prevSize);
-            if (contentSectors.Count != contentSectorCount)
-                throw new ArgumentException($"原内容扇区数量不匹配，需要 {contentSectorCount} 个，实际提供 {contentSectors.Count} 个");
+            int newCount = DiskManager.GetSectorCount(curSize) - DiskManager.GetSectorCount(prevSize);
+            if (newSectors.Count != newCount)
+                throw new ArgumentException($"新扇区数量不匹配，需要 {newCount} 个，实际提供 {newSectors.Count} 个");
+            int addressCount = DiskManager.GetAddressSectorCount(prevSize);
+            if (addressSectors.Count != addressCount)
+                throw new ArgumentException($"原索引扇区数量不匹配，需要 {addressCount} 个，实际提供 {addressSectors.Count} 个");
 
-            // 获取所有可能发生变化的索引盘块权限 保证后续更改成功
-            //List<Sector> addressSectors = new();
-            
+            // 将新扇区分为内容盘块和索引盘块两部分
+            int newContentCount = DiskManager.GetContentSectorCount(curSize) - DiskManager.GetContentSectorCount(prevSize);
+            int newAddressCount = newCount - newContentCount;
+            List<Sector> newContentSectors = new(newSectors.GetRange(0, newContentCount)); 
+            addressSectors.AddRange(newSectors.GetRange(newContentCount, newAddressCount));
 
-            // 将扇区分为内容盘块和索引盘块两部分
-            //List<Sector> contentSectors = new(newSectors.GetRange(0, contentSectorCount));
-            //List<Sector> addressSectors = new(newSectors.GetRange(contentSectorCount, sectorCount - contentSectorCount));
+            // 更新索引扇区内容
+            UpdateAddressImpl(curSize, prevSize, sectorManager, newContentSectors, addressSectors);
 
-            // 
-            return contentSectors;
+            // 返回新增的待写入的内容扇区
+            return newContentSectors;
+        }
+
+        // 实际更新索引扇区的函数
+        private void UpdateAddressImpl(int curSize, int prevSize, ISectorManager sectorManager, List<Sector> newContentSectors, List<Sector> addressSectors)
+        {
+            int start = DiskManager.GetContentSectorCount(prevSize);    // 使用的最小扇区号
+            int end = DiskManager.GetContentSectorCount(curSize) - 1;   // 使用的最大扇区号
+
+            // 一级索引无需设置索引扇区
+            int index = 0;
+            int sectorIndex = 0;
+            int newIndex = 0;
+            for (; index < 6 && sectorIndex <= end; ++index, ++sectorIndex)
+                if (sectorIndex >= start)   // 只更新需要更新的扇区
+                    address[index] = newContentSectors[newIndex++].number;
+            if (sectorIndex > end)
+                return;
+
+            // 二级索引
+            int[] buffer = new int[DiskManager.INT_PER_SECTOR];
+            for (; index < 8 && sectorIndex <= end; ++index)
+            {
+                // 获取二级索引扇区
+                Sector curSector = addressSectors[index - 6];
+                sectorManager.ReadArray(curSector, buffer, 0, DiskManager.INT_PER_SECTOR);
+                for (int j = 0; j < buffer.Length && sectorIndex <= end; ++j, ++sectorIndex)
+                    if (sectorIndex >= start)   // 只更新需要更新的扇区
+                        buffer[j] = newContentSectors[newIndex++].number;
+                // 写回扇区数据
+                sectorManager.WriteArray(curSector, buffer, 0, DiskManager.INT_PER_SECTOR);
+                // 写入地址
+                address[index] = curSector.number;
+            }
+            if (sectorIndex > end)
+                return;
+
+            // 三级索引
+            int[] buffer2 = new int[DiskManager.INT_PER_SECTOR];
+            for (; index < 10 && sectorIndex <= end; ++index)
+            {
+                // 获取三级索引扇区
+                Sector curSector = addressSectors[2 + (index - 8) * (1 + DiskManager.INT_PER_SECTOR)];
+                sectorManager.ReadArray(curSector, buffer, 0, DiskManager.INT_PER_SECTOR);
+                for (int page = 0; page < buffer.Length && sectorIndex <= end; ++page)
+                {
+                    // 获取二级索引扇区
+                    Sector curSector2 = addressSectors[2 + (index - 8) * (1 + DiskManager.INT_PER_SECTOR) + 1 + page];
+                    sectorManager.ReadArray(curSector2, buffer2, 0, DiskManager.INT_PER_SECTOR);
+                    for (int k = 0; k < buffer2.Length && sectorIndex <= end; ++k, ++sectorIndex)
+                        if (sectorIndex >= start)   // 只更新需要更新的扇区
+                            buffer2[k] = newContentSectors[newIndex++].number;
+                    // 写回二级索引扇区数据
+                    sectorManager.WriteArray(curSector2, buffer2, 0, DiskManager.INT_PER_SECTOR);
+                    // 更新三级索引
+                    buffer[page] = curSector2.number;
+                }
+                // 写回三级索引扇区数据
+                sectorManager.WriteArray(curSector, buffer, 0, DiskManager.INT_PER_SECTOR);
+                // 写入地址
+                address[index] = curSector.number;
+            }
         }
 
         public void Dispose()
