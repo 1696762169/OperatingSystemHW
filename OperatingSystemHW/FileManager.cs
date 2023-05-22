@@ -16,6 +16,8 @@ namespace OperatingSystemHW
     {
         private readonly ISectorManager m_SectorManager;    // 文件块管理器
         private readonly IInodeManager m_InodeManager;      // Inode管理器
+
+        public IUserManager UserManager => m_UserManager;
         private readonly IUserManager m_UserManager;        // 用户管理器
 
         public FileManager(ISectorManager sectorManager, IInodeManager inodeManager, IUserManager userManager)
@@ -43,7 +45,7 @@ namespace OperatingSystemHW
             if (PathUtility.IsDirectory(path))
                 throw new ArgumentException("路径不能是目录：" + path);
             // 获取目标文件夹
-            using OpenFile dir = Open(m_InodeManager.GetInode(GetDirInode(path, m_UserManager.Current)));
+            using OpenFile dir = Open(m_InodeManager.GetInode(GetDirInode(path)));
 
             // 检查是否已经有重名文件
             try
@@ -72,7 +74,7 @@ namespace OperatingSystemHW
             if (PathUtility.IsDirectory(path))
                 throw new ArgumentException("路径不能是目录：" + path);
             // 获取目标文件夹
-            using OpenFile dir = Open(m_InodeManager.GetInode(GetDirInode(path, m_UserManager.Current)));
+            using OpenFile dir = Open(m_InodeManager.GetInode(GetDirInode(path)));
 
             // 检查是否存在文件
             int fileInodeNo;
@@ -113,6 +115,32 @@ namespace OperatingSystemHW
             {
                 fileSectors.ForEach(sector => sector.Dispose());
             }
+        }
+
+        public void CreateDirectory(string path)
+        {
+            // 检查是否已经有重名目录
+            if (DirectoryExists(path))
+                throw new ArgumentException("已经有重名目录：" + path);
+
+            // 查找父目录
+            path = PathUtility.ToFilePath(path);
+            using OpenFile parent = Open(m_InodeManager.GetInode(GetDirInode(path)));
+
+            // 获取一个空闲Inode
+            using Inode inode = m_InodeManager.GetEmptyInode();
+
+            // 写入新的文件目录项
+            AddEntry(parent, new Entry(inode.number, PathUtility.ToDirectoryPath(PathUtility.GetFileName(path))));
+
+            // 更新Inode信息
+            inode.uid = (short)m_UserManager.Current.UserId;
+            m_InodeManager.UpdateInode(inode.number, inode);
+        }
+
+        public void DeleteDirectory(string path, bool deleteSub)
+        {
+            throw new NotImplementedException();
         }
 
         public void ReadBytes(OpenFile file, byte[] data)
@@ -271,6 +299,46 @@ namespace OperatingSystemHW
             return GetEntries(inode);
         }
 
+        public bool FileExists(string path)
+        {
+            try
+            {
+                using Inode dir = m_InodeManager.GetInode(GetDirInode(path));
+                GetFileInode(dir, PathUtility.GetFileName(path));
+                return true;
+            }
+            catch (FileNotFoundException) { return false; }
+            catch (DirectoryNotFoundException) { return false; }
+        }
+
+        public bool DirectoryExists(string path)
+        {
+            try
+            {
+                GetDirInode(PathUtility.ToDirectoryPath(path));
+                return true;
+            }
+            catch (DirectoryNotFoundException)
+            {
+                return false;
+            }
+        }
+
+        public void ChangeDirectory(string path)
+        {
+            try
+            {
+                int inodeNo = GetDirInode(PathUtility.ToDirectoryPath(path));
+                string temp = PathUtility.ToFilePath(path);
+                m_UserManager.Current.ChangeDirectory(inodeNo, PathUtility.ToDirectoryPath(PathUtility.GetFileName(temp)));
+                m_UserManager.UpdateUser(m_UserManager.CurrentIndex);
+            }
+            catch (DirectoryNotFoundException)
+            {
+                throw new ArgumentException($"未找到路径：{path}");
+            }
+        }
+
         #region 公共实现
         /// <summary>
         /// 申请需要读取内容得的扇区权限
@@ -373,7 +441,7 @@ namespace OperatingSystemHW
             if (string.IsNullOrEmpty(path) || PathUtility.IsDirectory(path))
                 throw new ArgumentException("路径不能为空或者是目录");
 
-            using Inode dirInode = m_InodeManager.GetInode(GetDirInode(path, user));
+            using Inode dirInode = m_InodeManager.GetInode(GetDirInode(path));
             return GetFileInode(dirInode, PathUtility.GetFileName(path));
         }
         // 根据目录Inode和文件名查找文件Inode序号
@@ -392,11 +460,12 @@ namespace OperatingSystemHW
             throw new FileNotFoundException($"未找到文件：{fileName}");
         }
         // 根据路径查找目录Inode序号
-        private int GetDirInode(string path, User user)
+        private int GetDirInode(string path)
         {
             if (string.IsNullOrEmpty(path))
                 throw new ArgumentException("路径不能为空");
             // 判断查找起点
+            User user = m_UserManager.Current;
             int cur = path[0] == '/' ? user.HomeNo : user.CurrentNo;
 
             // 查找所有路径项
@@ -414,7 +483,7 @@ namespace OperatingSystemHW
                 bool find = false;
                 foreach (Entry entry in GetEntries(inode))
                 {
-                    if (entry.name != item)
+                    if (entry.name != PathUtility.ToDirectoryPath(item))
                         continue;
                     cur = entry.inodeNo;
                     find = true;

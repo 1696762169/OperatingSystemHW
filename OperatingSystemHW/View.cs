@@ -14,10 +14,10 @@ namespace OperatingSystemHW
         private readonly IFileManager m_FileManager;
         private readonly IUserManager m_UserManager;
 
-        public View(IUserManager userManager, IFileManager fileManager)
+        public View(IFileManager fileManager)
         {
             m_FileManager = fileManager;
-            m_UserManager = userManager;
+            m_UserManager = fileManager.UserManager;
         }
 
         /// <summary>
@@ -53,6 +53,15 @@ namespace OperatingSystemHW
                     case "rm":
                         DeleteFile(args);
                         break;
+                    case "mkdir":
+                        CreateDirectory(args);
+                        break;
+                    case "rmdir":
+                        DeleteDirectory(args);
+                        break;
+                    case "cd":
+                        ChangeDirectory(args);
+                        break;
                     case "clear":   // 清理屏幕输出
                         Console.Clear();
                         break;
@@ -85,19 +94,41 @@ namespace OperatingSystemHW
         }
 
         // 创建文件
-        private void CreateFile(string[] args)
+        private void CreateFile(IReadOnlyList<string> args)
         {
-            if (args.Length != 1)
-                throw new ArgumentException($"参数数量错误，应为 1 个参数，实际得到 {args.Length} 个");
+            if (args.Count != 1)
+                throw new ArgumentException($"参数数量错误，应为 1 个参数，实际得到 {args.Count} 个");
             m_FileManager.CreateFile(args[0]);
         }
-
         // 删除文件
-        private void DeleteFile(string[] args)
+        private void DeleteFile(IReadOnlyList<string> args)
         {
-            if (args.Length != 1)
-                throw new ArgumentException($"参数数量错误，应为 1 个参数，实际得到 {args.Length} 个");
+            if (args.Count != 1)
+                throw new ArgumentException($"参数数量错误，应为 1 个参数，实际得到 {args.Count} 个");
             m_FileManager.DeleteFile(args[0]);
+        }
+
+        // 创建文件夹
+        private void CreateDirectory(IReadOnlyList<string> args)
+        {
+            if (args.Count != 1)
+                throw new ArgumentException($"参数数量错误，应为 1 个参数，实际得到 {args.Count} 个");
+            m_FileManager.CreateDirectory(args[0]);
+        }
+        // 删除文件夹
+        private void DeleteDirectory(IReadOnlyList<string> args)
+        {
+            if (args.Count != 1)
+                throw new ArgumentException($"参数数量错误，应为 1 个参数，实际得到 {args.Count} 个");
+            m_FileManager.DeleteDirectory(args[0], false);
+        }
+
+        // 更改当前工作文件夹
+        private void ChangeDirectory(IReadOnlyList<string> args)
+        {
+            if (args.Count != 1)
+                throw new ArgumentException($"参数数量错误，应为 1 个参数，实际得到 {args.Count} 个");
+            m_FileManager.ChangeDirectory(args[0]);
         }
     }
 }

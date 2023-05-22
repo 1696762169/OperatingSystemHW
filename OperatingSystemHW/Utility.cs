@@ -132,5 +132,7 @@ namespace OperatingSystemHW
         /// </summary>
         public static bool IsDirectory(string path) => path.EndsWith('/');
         public static string GetFileName(string path) => path.Split('/').Last();
+        public static string ToFilePath(string path) => path.TrimEnd('/');
+        public static string ToDirectoryPath(string path) => path + '/';
     }
 }

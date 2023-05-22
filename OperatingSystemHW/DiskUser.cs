@@ -47,8 +47,8 @@ namespace OperatingSystemHW
 
                 // 设置超级用户目录
                 super.home.inodeNo = super.current.inodeNo = DiskManager.ROOT_INODE_NO;
-                Marshal.Copy(Utility.EncodeString("\\"), 0, (IntPtr)super.home.name, 1);
-                Marshal.Copy(Utility.EncodeString("\\"), 0, (IntPtr)super.current.name, 1);
+                Marshal.Copy(Utility.EncodeString("/"), 0, (IntPtr)super.home.name, 1);
+                Marshal.Copy(Utility.EncodeString("/"), 0, (IntPtr)super.current.name, 1);
             }
             return super;
         }

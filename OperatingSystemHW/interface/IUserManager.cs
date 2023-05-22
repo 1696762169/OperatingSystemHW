@@ -12,6 +12,7 @@ namespace OperatingSystemHW
     internal interface IUserManager
     {
         public User Current { get; }   // 当前用户
+        public int CurrentIndex { get; }   // 当前用户
         public void SetCurrent(int index);  // 设置当前用户
 
         /// <summary>

@@ -68,9 +68,10 @@ namespace OperatingSystemHW
             return diskUser;
         }
 
-        public void ChangeDirectory(Entry directory)
+        public void ChangeDirectory(int inodeNo, string path)
         {
-            
+            CurrentNo = inodeNo;
+            Current = path;
         }
     }
 }

@@ -16,7 +16,7 @@ namespace OperatingSystemHW
             BlockManager blockManager = new(diskManager, fileSystem);
             FileManager fileManager = new(blockManager, blockManager, fileSystem);
 
-            View view = new(fileSystem, fileManager);
+            View view = new(fileManager);
             view.Start();
         }
     }

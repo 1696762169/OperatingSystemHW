@@ -15,6 +15,8 @@ namespace OperatingSystemHW
 
     internal interface IFileManager
     {
+        public IUserManager UserManager { get; }
+
         /// <summary>
         /// 打开文件
         /// </summary>
@@ -32,6 +34,15 @@ namespace OperatingSystemHW
         /// 删除文件
         /// </summary>
         public void DeleteFile(string path);
+
+        /// <summary>
+        /// 创建目录
+        /// </summary>
+        public void CreateDirectory(string path);
+        /// <summary>
+        /// 删除目录
+        /// </summary>
+        public void DeleteDirectory(string path, bool deleteSub);
 
         /// <summary>
         /// 从文件读取二进制数据
@@ -60,5 +71,19 @@ namespace OperatingSystemHW
         /// </summary>
         /// <returns></returns>
         public IEnumerable<Entry> GetEntries();
+
+        /// <summary>
+        /// 判断一个路径是否为一个已存在的文件
+        /// </summary>
+        public bool FileExists(string path);
+        /// <summary>
+        /// 判断一个路径是否为一个已存在的目录
+        /// </summary>
+        public bool DirectoryExists(string path);
+
+        /// <summary>
+        /// 切换当前工作目录
+        /// </summary>
+        public void ChangeDirectory(string path);
     }
 }
