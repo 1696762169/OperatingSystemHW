@@ -43,7 +43,7 @@ namespace OperatingSystemHW
         {
             // 当img文件不存在时创建该文件
             bool isFileExist = File.Exists(filePath);
-            if (!isFileExist)
+            if (!isFileExist || forceCreate)
             {
                 // 创建目录
                 string? dir = Path.GetDirectoryName(filePath);

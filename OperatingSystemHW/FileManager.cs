@@ -60,7 +60,6 @@ namespace OperatingSystemHW
             using Inode inode = m_InodeManager.GetEmptyInode();
             // 写入新的文件目录项
             AddEntry(dirInode, new Entry(inode.number, PathUtility.GetFileName(path)));
-
         }
 
         public void Delete(string path)
@@ -88,16 +87,22 @@ namespace OperatingSystemHW
 
         public void WriteStruct<T>(OpenFile file, ref T value) where T : unmanaged
         {
-            // 写入位置超出文件范围且刚好在扇区末尾时 需要一个新扇区
-            int sectorNo = file.pointer != file.inode.size && file.pointer % DiskManager.SECTOR_SIZE == 0 ?
-                file.inode.GetUsedSector(file.pointer, m_SectorManager) : 
-                m_SectorManager.GetEmptySector();
-            // 写入结构体只能写入在单个扇区中
-            using Sector sector = m_SectorManager.GetSector(sectorNo);
-            m_SectorManager.WriteStruct(sector, ref value, file.pointer % DiskManager.SECTOR_SIZE);
-            // 更新文件指针和文件大小
-            file.pointer += Marshal.SizeOf<T>();
-            file.inode.size = Math.Max(file.inode.size, file.pointer);
+            List<Sector> sectors = WritePrepare(file, Marshal.SizeOf<T>());
+            try
+            {
+                // 写入结构体只能写入在单个扇区中
+                m_SectorManager.WriteStruct(sectors[0], ref value, file.pointer % DiskManager.SECTOR_SIZE);
+                file.pointer += Marshal.SizeOf<T>();
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine($"写入结构体失败：\n{e.Message}");
+                throw;
+            }
+            finally
+            {
+                sectors.ForEach(sector => sector.Dispose());
+            }
         }
 
         public void Seek(OpenFile file, int pos, SeekType type = SeekType.Begin)
@@ -119,6 +124,77 @@ namespace OperatingSystemHW
             using Inode inode = m_InodeManager.GetInode(m_UserManager.Current.CurrentNo);
             return GetEntries(inode);
         }
+
+        #region 公共实现
+        /// <summary>
+        /// 申请需要写入内容得扇区权限 并更新文件索引与大小
+        /// </summary>
+        /// <param name="file">打开文件结构</param>
+        /// <param name="writeSize">写入内容大小</param>
+        private List<Sector> WritePrepare(OpenFile file, int writeSize)
+        {
+            // 申请新扇区权限
+            int newSize = Math.Max(file.pointer + writeSize, file.inode.size);
+            List<Sector> newSectors;
+            try
+            {
+                newSectors = OpenFile.GetWritingSectors(newSize, file.inode.size, m_SectorManager);
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine($"申请新扇区失败：{e.Message}");
+                throw;
+            }
+            // 申请需要写入的原内容权限
+            List<Sector> contentSectors = new();
+            try
+            {
+                contentSectors.AddRange(file.inode.GetUsedContentSectors(m_SectorManager, file.pointer, writeSize)
+                    .Select(m_SectorManager.GetSector));
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine($"申请待写入原扇区失败：{e.Message}");
+                newSectors.ForEach(sector => sector.Dispose());
+                contentSectors.ForEach(sector => sector.Dispose());
+                throw;
+            }
+            // 申请索引扇区权限
+            List<Sector> addressSectors = new();
+            try
+            {
+                // 此处为后续简化起见 申请了所有索引扇区权限 即使是不会更改的索引扇区
+                addressSectors.AddRange(file.inode.GetUsedAddressSectors(m_SectorManager)
+                    .Select(m_SectorManager.GetSector));
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine($"申请索引扇区失败：{e.Message}");
+                newSectors.ForEach(sector => sector.Dispose());
+                contentSectors.ForEach(sector => sector.Dispose());
+                addressSectors.ForEach(sector => sector.Dispose());
+                throw;
+            }
+
+            // 更新索引
+            try
+            {
+                contentSectors.AddRange(file.inode.UpdateAddress(newSize, file.inode.size, m_SectorManager, newSectors, addressSectors));
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine($"更新Inode索引失败：{e.Message}");
+                newSectors.ForEach(sector => sector.Dispose());
+                contentSectors.ForEach(sector => sector.Dispose());
+                addressSectors.ForEach(sector => sector.Dispose());
+                throw;
+            }
+            // 更新文件大小
+            file.inode.size = newSize;
+
+            return contentSectors;
+        }
+        #endregion
 
         #region 辅助函数
         // 根据路径查找文件Inode序号
@@ -184,7 +260,7 @@ namespace OperatingSystemHW
         // 查找目录中的所有目录项
         private IEnumerable<Entry> GetEntries(Inode dirInode)
         {
-            int size = dirInode.size;
+            int readCount = dirInode.size / Marshal.SizeOf<DirectoryEntry>();
             DirectoryEntry[] buffer = new DirectoryEntry[DiskManager.SECTOR_SIZE / Marshal.SizeOf<DirectoryEntry>()];
             foreach (int sectorNo in dirInode.GetUsedContentSectors(m_SectorManager))
             {
@@ -192,11 +268,11 @@ namespace OperatingSystemHW
                 using Sector sector = m_SectorManager.GetSector(sectorNo);
 
                 // 读取剩余数量的目录项
-                int readNumber = Math.Min(size, DiskManager.SECTOR_SIZE / Marshal.SizeOf<DirectoryEntry>());
+                int readNumber = Math.Min(readCount, DiskManager.SECTOR_SIZE / Marshal.SizeOf<DirectoryEntry>());
                 m_SectorManager.ReadArray(sector, buffer, 0, readNumber);
                 for (int i = 0; i < readNumber; ++i)
                     yield return new Entry(buffer[i]);
-                size -= readNumber;
+                readCount -= readNumber;
             }
         }
         // 添加目录项

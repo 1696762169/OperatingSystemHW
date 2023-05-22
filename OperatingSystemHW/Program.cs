@@ -1,5 +1,6 @@
 ﻿using System.Runtime.InteropServices;
 using OperatingSystemHW.test;
+using System.Linq;
 
 namespace OperatingSystemHW
 {
@@ -9,17 +10,21 @@ namespace OperatingSystemHW
         {
             string filePath = "disk.img";
 
-            DiskManager diskManager = new(filePath);
+            using DiskManager diskManager = new(filePath);
+            //using DiskManager diskManager = new(filePath, true);
             FileSystem fileSystem = new(diskManager);
             BlockManager blockManager = new(diskManager, fileSystem);
             FileManager fileManager = new(blockManager, blockManager, fileSystem);
 
             User super = fileSystem.GetUser(0);
 
-            fileManager.CreateFile("/a.txt");
-            fileManager.CreateFile("/b.txt");
-            fileManager.CreateFile("/c.txt");
-            diskManager.Dispose();
+            foreach (Entry entry in fileManager.GetEntries())
+            {
+                System.Console.WriteLine(entry.name);
+            }
+            //fileManager.CreateFile("/a.txt");
+            //fileManager.CreateFile("/b.txt");
+            //fileManager.CreateFile("/c.txt");
         }
     }
 }

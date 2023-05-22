@@ -120,50 +120,20 @@ namespace OperatingSystemHW
             }
         }
 
-        /// <summary>
-        /// 申请写入文件所需的所有新扇区权限并返回
-        /// </summary>
-        /// <param name="prevSize">原文件大小 单位：字节</param>
-        /// <param name="curSize">新文件大小 单位：字节</param>
-        /// <param name="sectorManager">需要使用的扇区管理器</param>
-        public List<Sector> GetWritingSectors(int curSize, int prevSize, ISectorManager sectorManager)
-        {
-            // 计算需要的所有新扇区数量与内容新扇区数量
-            int sectorCount = DiskManager.GetSectorCount(curSize) - DiskManager.GetSectorCount(prevSize);
-            // 获取所有新扇区的写入权限 保证可完成写入
-            List<Sector> sectors = new(sectorCount);
-            try
-            {
-                for (int i = 0; i < sectorCount; i++)
-                    sectors.Add(new Sector(sectorManager.GetEmptySector(), sectorManager));
-            }
-            catch
-            {
-                // 未能找到所需的盘块时 释放所有已获得的资源
-                while (sectors.Count > 0)
-                {
-                    sectorManager.PutSector(sectors.Last());
-                    sectors.RemoveAt(sectors.Count - 1);
-                }
-                throw;
-            }
-            // 返回扇区
-            return sectors;
-        }
 
         /// <summary>
         /// 更新Inode的扇区索引数组 并更新间接索引扇区内容
         /// </summary>
         /// <param name="prevSize">原文件大小 单位：字节</param>
-        /// <param name="curSize">新文件大小 单位：字节</param>
+        /// <param name="newSize">新文件大小 单位：字节</param>
         /// <param name="sectorManager">需要使用的扇区管理器</param>
         /// <param name="newSectors">已经申请到使用权限的新扇区</param>
         /// <param name="addressSectors">已经申请到使用权限的所有原索引扇区</param>
         /// <returns>按序排列的内容扇区</returns>
-        public List<Sector> UpdateAddress(int curSize, int prevSize, ISectorManager sectorManager, List<Sector> newSectors, List<Sector> addressSectors)
+        public List<Sector> UpdateAddress(int newSize, int prevSize, ISectorManager sectorManager, List<Sector> newSectors, List<Sector> addressSectors)
         {
             // 检查扇区数量
-            int newCount = DiskManager.GetSectorCount(curSize) - DiskManager.GetSectorCount(prevSize);
+            int newCount = DiskManager.GetSectorCount(newSize) - DiskManager.GetSectorCount(prevSize);
             if (newSectors.Count != newCount)
                 throw new ArgumentException($"新扇区数量不匹配，需要 {newCount} 个，实际提供 {newSectors.Count} 个");
             int addressCount = DiskManager.GetAddressSectorCount(prevSize);
@@ -171,23 +141,23 @@ namespace OperatingSystemHW
                 throw new ArgumentException($"原索引扇区数量不匹配，需要 {addressCount} 个，实际提供 {addressSectors.Count} 个");
 
             // 将新扇区分为内容盘块和索引盘块两部分
-            int newContentCount = DiskManager.GetContentSectorCount(curSize) - DiskManager.GetContentSectorCount(prevSize);
+            int newContentCount = DiskManager.GetContentSectorCount(newSize) - DiskManager.GetContentSectorCount(prevSize);
             int newAddressCount = newCount - newContentCount;
             List<Sector> newContentSectors = new(newSectors.GetRange(0, newContentCount)); 
             addressSectors.AddRange(newSectors.GetRange(newContentCount, newAddressCount));
 
             // 更新索引扇区内容
-            UpdateAddressImpl(curSize, prevSize, sectorManager, newContentSectors, addressSectors);
+            UpdateAddressImpl(newSize, prevSize, sectorManager, newContentSectors, addressSectors);
 
             // 返回新增的待写入的内容扇区
             return newContentSectors;
         }
 
         // 实际更新索引扇区的函数
-        private void UpdateAddressImpl(int curSize, int prevSize, ISectorManager sectorManager, List<Sector> newContentSectors, List<Sector> addressSectors)
+        private void UpdateAddressImpl(int newSize, int prevSize, ISectorManager sectorManager, List<Sector> newContentSectors, List<Sector> addressSectors)
         {
             int start = DiskManager.GetContentSectorCount(prevSize);    // 使用的最小扇区号
-            int end = DiskManager.GetContentSectorCount(curSize) - 1;   // 使用的最大扇区号
+            int end = DiskManager.GetContentSectorCount(newSize) - 1;   // 使用的最大扇区号
 
             // 一级索引无需设置索引扇区
             int index = 0;

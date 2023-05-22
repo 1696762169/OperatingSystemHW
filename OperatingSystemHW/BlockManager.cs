@@ -92,7 +92,7 @@ namespace OperatingSystemHW
                 if (m_SearchFreeSector >= m_SectorUsed.Length)
                     m_SearchFreeSector = DiskManager.DATA_START_SECTOR;
             }
-            return m_SearchFreeSector;
+            return m_SearchFreeSector++;
         }
 
         public Sector GetSector(int sectorNo)
@@ -185,7 +185,7 @@ namespace OperatingSystemHW
                 if (m_SearchFreeInode >= m_InodeUsed.Length)
                     m_SearchFreeInode = 1;
             }
-            return GetInode(m_SearchFreeInode);
+            return GetInode(m_SearchFreeInode++);
         }
 
         public Inode GetInode(int inodeNo)

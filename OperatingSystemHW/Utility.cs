@@ -42,49 +42,49 @@ namespace OperatingSystemHW
                 length = size - start;
 
             int returnStart = start / DiskManager.SECTOR_SIZE;
-            int returnEnd = DiskManager.GetContentSectorCount(start + length);
+            int returnEnd = DiskManager.GetContentSectorCount(Math.Min(start + length, size));
             int sector = 0;
 
             // 一级索引
             int index = 0;
-            for (; index < 6 && sector <= returnEnd; ++index, ++sector)
+            for (; index < 6 && sector < returnEnd; ++index, ++sector)
                 if (getContent && ReturnContent(sector))
                     yield return (address[index], true);
-            if (sector > returnEnd)
+            if (sector >= returnEnd)
                 yield break;
 
             // 二级索引
-            for (; index < 8 && sector <= returnEnd; ++index)
+            for (; index < 8 && sector < returnEnd; ++index)
             {
                 int[] buffer = getSector(address[index]);
                 if (getAddress && ReturnAddress(index))
                     yield return (address[index], false);
-                for (int j = 0; j < buffer.Length && sector <= returnEnd; ++j, ++sector)
+                for (int j = 0; j < buffer.Length && sector < returnEnd; ++j, ++sector)
                     if (getContent && ReturnContent(sector))
                         yield return (buffer[j], true);
             }
-            if (sector > returnEnd)
+            if (sector >= returnEnd)
                 yield break;
 
             // 三级索引
-            for (; index < 10 && sector <= returnEnd; ++index)
+            for (; index < 10 && sector < returnEnd; ++index)
             {
                 int[] buffer = getSector(address[index]);
                 if (getAddress && ReturnAddress(index))
                     yield return (address[index], false);
-                for (int page = 0; page < buffer.Length && sector <= returnEnd; ++page)
+                for (int page = 0; page < buffer.Length && sector < returnEnd; ++page)
                 {
                     int[] buffer2 = getSector(buffer[page]);
                     if (getAddress && ReturnAddress(index, page))
                         yield return (buffer[page], false);
-                    for (int k = 0; k < buffer2.Length && sector <= returnEnd; ++k, ++sector)
+                    for (int k = 0; k < buffer2.Length && sector < returnEnd; ++k, ++sector)
                         if (getContent && ReturnContent(sector))
                             yield return (buffer2[k], true);
                 }
             }
 
             // 判断是否需要返回该内容扇区
-            bool ReturnContent(int s) => s >= returnStart && s <= returnEnd;
+            bool ReturnContent(int s) => s >= returnStart && s < returnEnd;
             // 判断是否需要返回该索引扇区
             bool ReturnAddress(int i, int p = -1)
             {
@@ -97,27 +97,27 @@ namespace OperatingSystemHW
                     // 二级索引扇区范围
                     i -= 6;
                     addressStart = i * PAGE_SIZE + 6;
-                    addressEnd = addressStart + PAGE_SIZE - 1;
+                    addressEnd = addressStart + PAGE_SIZE;
                     break;
                 case 8 or 9:
                     // 三级索引扇区范围
                     i -= 8;
-                    if (p <= 0)
+                    if (p < 0)
                     {
                         addressStart = i * PAGE_SIZE * PAGE_SIZE + 2 * PAGE_SIZE + 6;
-                        addressEnd = addressStart + PAGE_SIZE * PAGE_SIZE - 1;
+                        addressEnd = addressStart + PAGE_SIZE * PAGE_SIZE;
                     }
                     // 三级索引下的二级索引范围
                     else
                     {
                         addressStart = i * PAGE_SIZE * PAGE_SIZE + 2 * PAGE_SIZE + 6 + p * PAGE_SIZE;
-                        addressEnd = addressStart + PAGE_SIZE - 1;
+                        addressEnd = addressStart + PAGE_SIZE;
                     }
                     break;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(i));
                 }
-                return addressEnd >= returnStart && addressStart <= returnEnd;
+                return addressEnd > returnStart && addressStart < returnEnd;
             }
         }
     }

@@ -13,13 +13,6 @@ namespace OperatingSystemHW
     [StructLayout(LayoutKind.Sequential, Pack = 4)]
     internal struct SuperBlock
     {
-        //public const int FREE_SECTOR_CAPACITY = 120;    // 直接管理的空闲盘块最大数量
-        //public const int INODE_CAPACITY = 120;  // 直接管理的空闲外存Inode最大数量
-        //private int m_FreeCount;    // 直接管理的空闲盘块数
-        //private unsafe fixed int m_FreeSectors[FREE_SECTOR_CAPACITY];    // 直接管理的空闲盘块索引表
-        //private int m_InodeCount;   // 直接管理的空闲外存Inode数
-        //private unsafe fixed int m_Inodes[INODE_CAPACITY];   // 直接管理的空闲外存Inode索引表
-
         public const int SIZE = DiskManager.SUPER_BLOCK_SIZE * DiskManager.SECTOR_SIZE; // 超级块大小
         public const int MAX_USER_COUNT = SIZE / DiskUser.SIZE - 1; // 最大用户数
         public const int NO_USER_START = MAX_USER_COUNT * DiskUser.SIZE; // 非用户信息区起始位置

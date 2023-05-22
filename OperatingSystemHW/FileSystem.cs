@@ -36,7 +36,7 @@ namespace OperatingSystemHW
                     if (Utility.DecodeString(sb->signature, SuperBlock.SIGNATURE_SIZE) != "Made by JYX")
                     {
                         m_SuperBlock = SuperBlock.Init();
-                        UpdateSuperBlock();
+                        m_DiskManager.Write(DiskManager.SUPER_BLOCK_SECTOR * DiskManager.SECTOR_SIZE, ref m_SuperBlock);
                     }
                 }
             }
@@ -97,13 +97,5 @@ namespace OperatingSystemHW
         }
 
         private static bool CheckUserIndex(int index) => index is >= 0 and < SuperBlock.MAX_USER_COUNT;
-
-        /// <summary>
-        /// 将用户数据写入外存
-        /// </summary>
-        private void UpdateUser()
-        {
-
-        }
     }
 }
