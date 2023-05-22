@@ -31,7 +31,7 @@ namespace OperatingSystemHW
         /// <summary>
         /// 删除文件
         /// </summary>
-        public void Delete(string path);
+        public void DeleteFile(string path);
 
         /// <summary>
         /// 从文件读取二进制数据

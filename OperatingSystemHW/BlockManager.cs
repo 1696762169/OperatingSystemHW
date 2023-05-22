@@ -190,7 +190,7 @@ namespace OperatingSystemHW
 
         public Inode GetInode(int inodeNo)
         {
-            if (m_InodeLocks.Contains(m_SearchFreeInode))
+            if (m_InodeLocks.Contains(inodeNo))
                 throw new Exception($"Inode {inodeNo} 已被使用");
             m_InodeLocks.Add(inodeNo);
 

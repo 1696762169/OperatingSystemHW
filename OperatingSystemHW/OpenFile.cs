@@ -9,7 +9,7 @@ namespace OperatingSystemHW
     /// <summary>
     /// 打开文件结构
     /// </summary>
-    internal class OpenFile
+    internal class OpenFile : IDisposable
     {
         public readonly Inode inode;    // 文件对应的Inode
         public int pointer;             // 读写指针在文件中的位置
@@ -45,6 +45,11 @@ namespace OperatingSystemHW
             }
             // 返回扇区
             return sectors;
+        }
+
+        public void Dispose()
+        {
+            inode.Dispose();
         }
     }
 }

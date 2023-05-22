@@ -22,9 +22,18 @@ namespace OperatingSystemHW
             {
                 System.Console.WriteLine(entry.name);
             }
-            //fileManager.CreateFile("/a.txt");
+            fileManager.CreateFile("/a.txt");
             //fileManager.CreateFile("/b.txt");
             //fileManager.CreateFile("/c.txt");
+            foreach (Entry entry in fileManager.GetEntries())
+            {
+                System.Console.WriteLine(entry.name);
+            }
+            fileManager.DeleteFile("/a.txt");
+            foreach (Entry entry in fileManager.GetEntries())
+            {
+                System.Console.WriteLine(entry.name);
+            }
         }
     }
 }
