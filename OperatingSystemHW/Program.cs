@@ -17,17 +17,17 @@ namespace OperatingSystemHW
 
             const string FILE_PATH = "disk.img";
 
-            //using DiskManager diskManager = new(FILE_PATH);
-            using DiskManager diskManager = new(FILE_PATH, true);
+            using DiskManager diskManager = new(FILE_PATH);
+            //using DiskManager diskManager = new(FILE_PATH, true);
             FileSystem fileSystem = new(diskManager);
             BlockManager blockManager = new(diskManager, fileSystem);
             FileManager fileManager = new(blockManager, blockManager, fileSystem);
 
             View view = new(fileManager);
 
-            //view.Start();
+            view.Start();
             //view.Start(InitialInput.BigFileInOut());
-            view.Start(InitialInput.CreateFile());
+            //view.Start(InitialInput.CreateFile());
         }
     }
 }

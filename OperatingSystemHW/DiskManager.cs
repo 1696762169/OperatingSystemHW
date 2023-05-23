@@ -6,6 +6,7 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
+#pragma warning disable CA1416
 
 namespace OperatingSystemHW
 {
@@ -33,6 +34,8 @@ namespace OperatingSystemHW
         public const int SMALL_FILE_SIZE = SECTOR_SIZE * 6;  // 小文件最大字节数
         public const int LARGE_FILE_SIZE = SECTOR_SIZE * (6 + INT_PER_SECTOR * 2);   // 大文件最大字节数
         public const int HUGE_FILE_SIZE = SECTOR_SIZE * (6 + INT_PER_SECTOR * (2 + INT_PER_SECTOR * 2)); // 巨大文件最大字节数
+
+        private const string MEMORY_NAME = "MadeByJYX";
         #endregion
 
         private readonly MemoryMappedFile m_MappedFile;    // 内存映射文件
@@ -54,8 +57,18 @@ namespace OperatingSystemHW
                 fs.SetLength(TOTAL_SECTOR * SECTOR_SIZE);
             }
 
-            // 创建内存映射文件
-            m_MappedFile = MemoryMappedFile.CreateFromFile(filePath);
+            // 尝试打开已经存在的内存映射文件
+            try
+            {
+                m_MappedFile = MemoryMappedFile.OpenExisting(MEMORY_NAME);
+                Console.WriteLine("打开了已有内存映射文件");
+            }
+            catch (FileNotFoundException)
+            {
+                // 创建内存映射文件
+                m_MappedFile = MemoryMappedFile.CreateFromFile(filePath, FileMode.OpenOrCreate, MEMORY_NAME, TOTAL_SECTOR * SECTOR_SIZE);
+            }
+            
             // 创建内存映射视图访问器
             accessor = m_MappedFile.CreateViewAccessor();
 

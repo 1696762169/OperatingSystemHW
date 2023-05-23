@@ -289,6 +289,8 @@ namespace OperatingSystemHW
                         Marshal.Copy((IntPtr)entry.name, nameBuffer, 0, nameBuffer.Length);
                     }
                     string name = Utility.DecodeString(nameBuffer);
+                    if (name is "./" or "../")
+                        continue;
                     SetUsedSectors(entry.inodeNo, !string.IsNullOrEmpty(name) && PathUtility.IsDirectory(name));
                     if (--dirCount <= 0)
                         return;

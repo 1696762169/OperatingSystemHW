@@ -60,9 +60,9 @@ namespace OperatingSystemHW.test
             }
 
             sb.AppendLine("cd /");
-            sb.AppendLine("debug on");
-            sb.AppendLine("rmdir in0 -r");
-            sb.AppendLine("debug off");
+            //sb.AppendLine("debug on");
+            sb.AppendLine("rmdir in0/in1 -r");
+            //sb.AppendLine("debug off");
             sb.AppendLine("end");
             return new StringReader(sb.ToString());
         }
