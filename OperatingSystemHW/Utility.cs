@@ -131,8 +131,12 @@ namespace OperatingSystemHW
         /// 判断一个路径字符串是否为目录
         /// </summary>
         public static bool IsDirectory(string path) => path.EndsWith('/');
+
         public static string GetFileName(string path) => path.Split('/').Last();
+
         public static string ToFilePath(string path) => path.TrimEnd('/');
-        public static string ToDirectoryPath(string path) => path + '/';
+        public static string ToDirectoryPath(string path) => path + (IsDirectory(path) ? "" : "/");
+
+        public static string Join(string path1, string path2) => ToDirectoryPath(path1) + path2;
     }
 }

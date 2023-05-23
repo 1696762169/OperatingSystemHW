@@ -42,6 +42,7 @@ namespace OperatingSystemHW
         /// <summary>
         /// 删除目录
         /// </summary>
+        /// <exception cref="UnauthorizedAccessException">目录或其子目录/文件已被占用</exception>
         public void DeleteDirectory(string path, bool deleteSub);
 
         /// <summary>

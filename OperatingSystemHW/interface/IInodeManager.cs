@@ -18,6 +18,7 @@ namespace OperatingSystemHW
         /// <summary>
         /// 获取一个Inode的控制权
         /// </summary>
+        /// <exception cref="UnauthorizedAccessException">Inode已被占用</exception>
         public Inode GetInode(int inodeNo);
         /// <summary>
         /// 释放一个Inode

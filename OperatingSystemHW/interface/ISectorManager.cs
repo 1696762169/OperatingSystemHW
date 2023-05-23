@@ -20,6 +20,7 @@ namespace OperatingSystemHW
         /// <summary>
         /// 获取一个指定盘块的控制权
         /// </summary>
+        /// <exception cref="UnauthorizedAccessException">扇区已被占用</exception>
         public Sector GetSector(int sectorNo);
         /// <summary>
         /// 归还一个指定盘块的控制权

@@ -98,7 +98,7 @@ namespace OperatingSystemHW
         public Sector GetSector(int sectorNo)
         {
             if (m_SectorLocks.Contains(sectorNo))
-                throw new Exception($"扇区 {sectorNo} 已被使用");
+                throw new UnauthorizedAccessException($"扇区 {sectorNo} 已被使用");
             m_SectorLocks.Add(sectorNo);
             return new Sector(sectorNo, this);
         }
@@ -191,7 +191,7 @@ namespace OperatingSystemHW
         public Inode GetInode(int inodeNo)
         {
             if (m_InodeLocks.Contains(inodeNo))
-                throw new Exception($"Inode {inodeNo} 已被使用");
+                throw new UnauthorizedAccessException($"Inode {inodeNo} 已被使用");
             m_InodeLocks.Add(inodeNo);
 
             ReadDiskInode(inodeNo, out DiskInode diskInode);

@@ -29,7 +29,7 @@ namespace OperatingSystemHW
 
         public OpenFile Open(string path)
         {
-            Inode inode = m_InodeManager.GetInode(GetFileInode(path, m_UserManager.Current));
+            Inode inode = m_InodeManager.GetInode(GetFileInode(path));
             // 打开文件即申请Inode使用权
             return new OpenFile(inode);
         }
@@ -84,8 +84,7 @@ namespace OperatingSystemHW
             }
             catch (FileNotFoundException)
             {
-                Console.WriteLine("文件不存在：" + path);
-                return;
+                throw new FileNotFoundException("文件不存在：" + path);
             }
 
             List<Sector> fileSectors = new();
@@ -106,10 +105,9 @@ namespace OperatingSystemHW
                 fileInode.uid = 0;
                 m_InodeManager.UpdateInode(fileInodeNo, fileInode);
             }
-            catch (Exception e)
+            catch (UnauthorizedAccessException e)
             {
-                Console.WriteLine($"获取待删除文件扇区失败：{e.Message}");
-                throw;
+                throw new UnauthorizedAccessException($"获取待删除文件扇区失败：{e.Message}");
             }
             finally
             {
@@ -140,7 +138,70 @@ namespace OperatingSystemHW
 
         public void DeleteDirectory(string path, bool deleteSub)
         {
-            throw new NotImplementedException();
+            // 获取待删除目录的父目录与自身
+            if (path.Trim() == "/")
+                throw new ArgumentException("无法删除根目录");
+            if (path.Trim() == m_UserManager.Current.Home)
+                throw new ArgumentException("无法删除用户主目录");
+
+            // 检查是否存在目录
+            if (!DirectoryExists(path))
+                throw new DirectoryNotFoundException("目录不存在：" + path);
+
+            using Inode dirInode = m_InodeManager.GetInode(GetDirInode(PathUtility.ToDirectoryPath(path)));
+            using OpenFile parent = Open(m_InodeManager.GetInode(GetDirInode(PathUtility.ToFilePath(path))));
+
+            // 检查目录是否为空目录
+            if (!deleteSub)
+            {
+                if (GetEntries(dirInode).Any())
+                {
+                    throw new ArgumentException($"目录不是空目录，不可删除：{path}");
+                }
+            }
+
+            // 递归删除其子目录与文件
+            foreach (Entry entry in GetEntries(dirInode))
+            {
+                string sub = PathUtility.Join(path, entry.name);
+                try
+                {
+                    if (PathUtility.IsDirectory(entry.name))
+                        DeleteDirectory(sub, deleteSub);
+                    else
+                        DeleteFile(sub);
+                }
+                catch (UnauthorizedAccessException e)
+                {
+                    throw new UnauthorizedAccessException($"无法删除子目录/文件 {sub} ：{e.Message}");
+                }
+            }
+
+            // 删除此目录
+            List<Sector> dirSectors = new();
+            try
+            {
+                // 获取文件扇区访问权限
+                dirSectors.AddRange(dirInode.GetUsedSectors(m_SectorManager)
+                    .Select(pair => m_SectorManager.GetSector(pair.sectorNo)));
+
+                // 删除文件目录项（可能失败）
+                RemoveEntry(parent, dirInode.number);
+
+                // 释放文件占用磁盘空间
+                m_SectorManager.ClearSector(dirSectors.ToArray());
+                // 释放文件Inode（将文件所有者修改为无效值0）
+                dirInode.uid = 0;
+                m_InodeManager.UpdateInode(dirInode.number, dirInode);
+            }
+            catch (UnauthorizedAccessException e)
+            {
+                throw new UnauthorizedAccessException($"获取待删除目录扇区失败：{e.Message}");
+            }
+            finally
+            {
+                dirSectors.ForEach(sector => sector.Dispose());
+            }
         }
 
         public void ReadBytes(OpenFile file, byte[] data)
@@ -436,7 +497,7 @@ namespace OperatingSystemHW
 
         #region 辅助函数
         // 根据路径查找文件Inode序号
-        private int GetFileInode(string path, User user)
+        private int GetFileInode(string path)
         {
             if (string.IsNullOrEmpty(path) || PathUtility.IsDirectory(path))
                 throw new ArgumentException("路径不能为空或者是目录");

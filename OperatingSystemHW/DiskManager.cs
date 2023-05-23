@@ -69,8 +69,8 @@ namespace OperatingSystemHW
 
         public void Dispose()
         {
-            m_MappedFile.Dispose();
             accessor.Dispose();
+            m_MappedFile.Dispose();
         }
 
         public void ReadBytes(byte[] buffer, int offset, int count)
