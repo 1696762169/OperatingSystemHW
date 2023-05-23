@@ -216,6 +216,13 @@ namespace OperatingSystemHW
             }
         }
 
+        public void Clear()
+        {
+            uid = 0;
+            size = 0;
+            address = new int[10];
+        }
+
         public void Dispose()
         {
             m_InodeManager.PutInode(number);

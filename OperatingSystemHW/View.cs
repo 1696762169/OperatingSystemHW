@@ -149,9 +149,10 @@ namespace OperatingSystemHW
             if (!File.Exists(args[0]))
                 throw new FileNotFoundException($"未找到待移入文件：{args[0]}");
 
-            // 如果文件不存在则创建文件
-            if (!m_FileManager.FileExists(args[1]))
-                m_FileManager.CreateFile(args[1]);
+            // 如果文件存在则先删除文件 然后创建新文件
+            if (m_FileManager.FileExists(args[1]))
+                m_FileManager.DeleteFile(args[1]);
+            m_FileManager.CreateFile(args[1]);
 
             // 打开文件进行写入
             OpenFile file = m_FileManager.Open(args[1]);

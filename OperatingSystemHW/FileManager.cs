@@ -105,7 +105,7 @@ namespace OperatingSystemHW
                 // 释放文件占用磁盘空间
                 m_SectorManager.ClearSector(fileSectors.ToArray());
                 // 释放文件Inode（将文件所有者修改为无效值0）
-                fileInode.uid = 0;
+                fileInode.Clear();
                 m_InodeManager.UpdateInode(fileInodeNo, fileInode);
             }
             catch (UnauthorizedAccessException e)
@@ -197,7 +197,7 @@ namespace OperatingSystemHW
                 // 释放文件占用磁盘空间
                 m_SectorManager.ClearSector(dirSectors.ToArray());
                 // 释放文件Inode（将文件所有者修改为无效值0）
-                dirInode.uid = 0;
+                dirInode.Clear();
                 m_InodeManager.UpdateInode(dirInode.number, dirInode);
             }
             catch (UnauthorizedAccessException e)
@@ -569,7 +569,7 @@ namespace OperatingSystemHW
             // 计算扇区删除截止位置
             int cutSize = (targetSize + DiskManager.SECTOR_SIZE - 1) / DiskManager.SECTOR_SIZE * DiskManager.SECTOR_SIZE;
             List<Sector> sectors = new();
-            if (cutSize < file.inode.size)
+            if (cutSize > file.inode.size)
                 return sectors;
             try
             {
