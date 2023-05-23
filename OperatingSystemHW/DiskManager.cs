@@ -61,7 +61,6 @@ namespace OperatingSystemHW
             try
             {
                 m_MappedFile = MemoryMappedFile.OpenExisting(MEMORY_NAME);
-                Console.WriteLine("打开了已有内存映射文件");
             }
             catch (FileNotFoundException)
             {

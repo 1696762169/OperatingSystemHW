@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -13,6 +14,11 @@ namespace OperatingSystemHW
     {
         private readonly IFileManager m_FileManager;
         private readonly IUserManager m_UserManager;
+
+        private readonly MsgParser m_MsgParser = new();
+
+        private bool m_Exit;
+        private bool m_EndInitializing;
 
         public View(IFileManager fileManager)
         {
@@ -35,55 +41,16 @@ namespace OperatingSystemHW
                 if (!initializing || !silenceInit)
                     Console.Write($"{m_UserManager.Current.Name}`{m_FileManager.GetCurrentPath()}>");
                 string? command = Console.ReadLine();
-                if (string.IsNullOrEmpty(command))
-                    continue;
-
-                string[] split = command.Split(' ');
-                string cmd = split[0];
-                string[] args = split.Where((str, index) => index > 0 && !string.IsNullOrEmpty(str)).ToArray();
 
                 try
                 {
-                    switch (cmd)
-                    {
-                    case "ls":
-                        ShowEntries();
-                        break;
-                    case "touch":
-                        CreateFile(args);
-                        break;
-                    case "rm":
-                        DeleteFile(args);
-                        break;
-                    case "mkdir":
-                        CreateDirectory(args);
-                        break;
-                    case "rmdir":
-                        DeleteDirectory(args);
-                        break;
-                    case "cd":
-                        ChangeDirectory(args);
-                        break;
-                    case "input":
-                        MoveFileIn(args);
-                        break;
-                    case "output":
-                        MoveFileIOut(args);
-                        break;
-                    case "clear":   // 清理屏幕输出
-                        Console.Clear();
-                        break;
-                    case "quit" or "exit":  // 退出应用
+                    ProcessCommand(command, false);
+                    if (m_Exit)
                         return;
-                    case "debug":   // 是否开启Debug
-                        BlockManager.SectorDebug = args is ["on"];
-                        break;
-                    case "end": // 初始输入结束
+                    if (m_EndInitializing)
+                    {
+                        m_EndInitializing = false;
                         Console.SetIn(std);
-                        initializing = false;
-                        break;
-                    default:    // 输入有误
-                        throw new ArgumentException($"找不到命令：{cmd}");
                     }
                 }
                 catch (Exception e)
@@ -93,8 +60,114 @@ namespace OperatingSystemHW
             }
         }
 
+        /// <summary>
+        /// 执行系统的用户交互界面
+        /// </summary>
+        /// <param name="client">连接到此服务器的客户端</param>
+        public void Start(TcpClient client)
+        {
+            NetworkStream stream = client.GetStream();
+            Send(stream, $"{m_UserManager.Current.Name}`{m_FileManager.GetCurrentPath()}>");
+            byte[] buffer = new byte[1024];
+            m_Exit = false;
+            while (!m_Exit)
+            {
+                int readCount;
+                try
+                {
+                    readCount = stream.Read(buffer);
+                }
+                catch (IOException)
+                {
+                    return;
+                }
+                if (readCount <= 0)
+                    continue;
+                foreach (SerializeMsg msg in m_MsgParser.ParseMsg(buffer[..readCount]))
+                {
+                    switch (msg)
+                    {
+                    case StringMsg str:
+                        try
+                        {
+                            // 发送消息
+                            Send(stream, ProcessCommand(str.data, true));
+                            if (m_Exit)
+                            {
+                                Send(stream, "成功退出服务器，连接已断开\n");
+                                stream.Write(new ExitMsg().ToBytes());
+                                return;
+                            }
+                            Send(stream,$"{m_UserManager.Current.Name}`{m_FileManager.GetCurrentPath()}>");
+                        }
+                        catch (Exception e)
+                        {
+                            // 发送错误
+                            Send(stream, e.Message + "\n");
+                            Send(stream, $"{m_UserManager.Current.Name}`{m_FileManager.GetCurrentPath()}>");
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+
+        private string ProcessCommand(string? command, bool whiteLs)
+        {
+            if (string.IsNullOrEmpty(command))
+                return "";
+
+            string[] split = command.Split(' ');
+            string cmd = split[0];
+            string[] args = split.Where((str, index) => index > 0 && !string.IsNullOrEmpty(str)).ToArray();
+
+            switch (cmd)
+            {
+            case "ls":
+                return whiteLs ? ShowEntriesWhite() : ShowEntries();
+            case "touch":
+                CreateFile(args);
+                break;
+            case "rm":
+                DeleteFile(args);
+                break;
+            case "mkdir":
+                CreateDirectory(args);
+                break;
+            case "rmdir":
+                DeleteDirectory(args);
+                break;
+            case "cd":
+                ChangeDirectory(args);
+                break;
+            case "input":
+                MoveFileIn(args);
+                break;
+            case "output":
+                MoveFileIOut(args);
+                break;
+            //case "clear":   // 清理屏幕输出
+            //    Console.Clear();
+            //    break;
+            case "quit" or "exit":  // 退出应用
+                m_Exit = true;
+                break;
+            case "debug":   // 是否开启Debug
+                BlockManager.SectorDebug = args is ["on"];
+                break;
+            case "end": // 初始输入结束
+                //Console.SetIn(std);
+                m_EndInitializing = true;
+                break;
+            default:    // 输入有误
+                throw new ArgumentException($"找不到命令：{cmd}");
+            }
+
+            return "";
+        }
+
         // 列出当前目录下的文件
-        private void ShowEntries()
+        private string ShowEntries()
         {
             foreach (Entry entry in m_FileManager.GetEntries())
             {
@@ -102,6 +175,14 @@ namespace OperatingSystemHW
                 Console.WriteLine(entry.name);
             }
             Console.ResetColor();
+            return "";
+        }
+        private string ShowEntriesWhite()
+        {
+            StringBuilder sb = new();
+            foreach (Entry entry in m_FileManager.GetEntries())
+                sb.AppendLine(entry.name);
+            return sb.ToString();
         }
 
         // 创建文件
@@ -182,6 +263,14 @@ namespace OperatingSystemHW
             m_FileManager.ReadBytes(file, buffer);
             m_FileManager.Close(file);
             File.WriteAllBytes(args[1], buffer);
+        }
+
+        // 向客户端发送消息
+        private static void Send(NetworkStream stream, string msg)
+        {
+            if (string.IsNullOrEmpty(msg))
+                return;
+            stream.Write(new StringMsg(msg).ToBytes());
         }
     }
 }
