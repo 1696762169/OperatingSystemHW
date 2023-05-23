@@ -25,12 +25,14 @@ namespace OperatingSystemHW
         /// </summary>
         /// <param name="initial">初始自动执行的内容</param>
         /// <param name="silenceInit">是否在自动执行内容时不显示字符</param>
-        public void Start(TextReader? initial = null, bool silenceInit = false)
+        public void Start(TextReader? initial = null, bool silenceInit = true)
         {
+            TextReader std = Console.In;
             Console.SetIn(initial ?? Console.In);
+            bool initializing = initial != null;
             while (true)
             {
-                if (!silenceInit)
+                if (!initializing || !silenceInit)
                     Console.Write($"{m_UserManager.Current.Name}`{m_UserManager.Current.Current}>");
                 string? command = Console.ReadLine();
                 if (string.IsNullOrEmpty(command))
@@ -62,14 +64,20 @@ namespace OperatingSystemHW
                     case "cd":
                         ChangeDirectory(args);
                         break;
+                    case "input":
+                        MoveFileIn(args);
+                        break;
+                    case "output":
+                        MoveFileIOut(args);
+                        break;
                     case "clear":   // 清理屏幕输出
                         Console.Clear();
                         break;
                     case "quit" or "exit":  // 退出应用
                         return;
                     case "end": // 初始输入结束
-                        Console.SetIn(Console.In);
-                        silenceInit = false;
+                        Console.SetIn(std);
+                        initializing = false;
                         break;
                     default:    // 输入有误
                         throw new ArgumentException($"找不到命令：{cmd}");
@@ -129,6 +137,47 @@ namespace OperatingSystemHW
             if (args.Count != 1)
                 throw new ArgumentException($"参数数量错误，应为 1 个参数，实际得到 {args.Count} 个");
             m_FileManager.ChangeDirectory(args[0]);
+        }
+
+        // 将文件移动到二级文件系统中
+        private void MoveFileIn(IReadOnlyList<string> args)
+        {
+            if (args.Count != 2)
+                throw new ArgumentException($"参数数量错误，应为 2 个参数，实际得到 {args.Count} 个");
+
+            // 检查文件和目录是否存在
+            if (!File.Exists(args[0]))
+                throw new FileNotFoundException($"未找到待移入文件：{args[0]}");
+
+            // 如果文件不存在则创建文件
+            if (!m_FileManager.FileExists(args[1]))
+                m_FileManager.CreateFile(args[1]);
+
+            // 打开文件进行写入
+            OpenFile file = m_FileManager.Open(args[1]);
+            m_FileManager.WriteBytes(file, File.ReadAllBytes(args[0]));
+            m_FileManager.Close(file);
+        }
+        // 将二级文件系统中的文件移出
+        private void MoveFileIOut(IReadOnlyList<string> args)
+        {
+            if (args.Count != 2)
+                throw new ArgumentException($"参数数量错误，应为 2 个参数，实际得到 {args.Count} 个");
+
+            // 检查文件和目录是否存在
+            if (!m_FileManager.FileExists(args[0]))
+                throw new FileNotFoundException($"未找到待移出文件：{args[0]}");
+
+            // 如果文件不存在则创建文件
+            if (!File.Exists(args[1]))
+                File.Create(args[1]).Close();
+
+            // 打开文件读出内容
+            OpenFile file = m_FileManager.Open(args[0]);
+            byte[] buffer = new byte[file.inode.size];
+            m_FileManager.ReadBytes(file, buffer);
+            m_FileManager.Close(file);
+            File.WriteAllBytes(args[1], buffer);
         }
     }
 }

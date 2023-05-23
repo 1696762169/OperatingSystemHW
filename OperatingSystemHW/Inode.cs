@@ -149,6 +149,8 @@ namespace OperatingSystemHW
             // 更新索引扇区内容
             UpdateAddressImpl(newSize, prevSize, sectorManager, newContentSectors, addressSectors);
 
+            // 释放索引扇区
+            addressSectors.ForEach(sector => sector.Dispose());
             // 返回新增的待写入的内容扇区
             return newContentSectors;
         }

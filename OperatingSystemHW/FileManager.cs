@@ -44,13 +44,16 @@ namespace OperatingSystemHW
         {
             if (PathUtility.IsDirectory(path))
                 throw new ArgumentException("路径不能是目录：" + path);
+            string fileName = PathUtility.GetFileName(path);
+            if (fileName.Length > DirectoryEntry.NAME_MAX_COUNT)
+                throw new ArgumentException("文件名过长");
             // 获取目标文件夹
             using OpenFile dir = Open(m_InodeManager.GetInode(GetDirInode(path)));
 
             // 检查是否已经有重名文件
             try
             {
-                GetFileInode(dir.inode, PathUtility.GetFileName(path));
+                GetFileInode(dir.inode, fileName);
                 throw new ArgumentException("已经有重名文件：" + path);
             }
             catch (FileNotFoundException)
@@ -120,6 +123,9 @@ namespace OperatingSystemHW
             // 检查是否已经有重名目录
             if (DirectoryExists(path))
                 throw new ArgumentException("已经有重名目录：" + path);
+            string dirName = PathUtility.ToDirectoryPath(PathUtility.GetFileName(PathUtility.ToFilePath(path)));
+            if (dirName.Length > DirectoryEntry.NAME_MAX_COUNT)
+                throw new ArgumentException("目录名过长");
 
             // 查找父目录
             path = PathUtility.ToFilePath(path);
@@ -129,7 +135,7 @@ namespace OperatingSystemHW
             using Inode inode = m_InodeManager.GetEmptyInode();
 
             // 写入新的文件目录项
-            AddEntry(parent, new Entry(inode.number, PathUtility.ToDirectoryPath(PathUtility.GetFileName(path))));
+            AddEntry(parent, new Entry(inode.number, dirName));
 
             // 更新Inode信息
             inode.uid = (short)m_UserManager.Current.UserId;
@@ -490,7 +496,7 @@ namespace OperatingSystemHW
             }
             // 更新文件大小
             file.inode.size = newSize;
-
+            m_InodeManager.UpdateInode(file.inode.number, file.inode);
             return contentSectors;
         }
         #endregion

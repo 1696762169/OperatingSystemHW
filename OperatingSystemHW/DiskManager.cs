@@ -129,10 +129,10 @@ namespace OperatingSystemHW
                 return 0;
             case <= LARGE_FILE_SIZE:
                 size -= SMALL_FILE_SIZE;
-                return size >= PAGE_SIZE ? 1 : 2;
+                return size >= PAGE_SIZE ? 2 : 1;
             default:
                 size -= LARGE_FILE_SIZE;
-                return 2 + (size >= INT_PER_SECTOR * PAGE_SIZE ? 1 : 2) + (size + PAGE_SIZE - 1) / PAGE_SIZE;
+                return 2 + (size >= INT_PER_SECTOR * PAGE_SIZE ? 2 : 1) + (size + PAGE_SIZE - 1) / PAGE_SIZE;
             }
         }
         /// <summary>
