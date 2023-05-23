@@ -11,6 +11,7 @@ namespace OperatingSystemHW
     /// </summary>
     internal interface IInodeManager
     {
+        public bool Formatting { get; set; }
         /// <summary>
         /// 获取一个空闲Inode的控制权
         /// </summary>

@@ -86,5 +86,9 @@ namespace OperatingSystemHW
         /// 切换当前工作目录
         /// </summary>
         public void ChangeDirectory(string path);
+        /// <summary>
+        /// 获取当前用户的工作目录
+        /// </summary>
+        public string GetCurrentPath();
     }
 }

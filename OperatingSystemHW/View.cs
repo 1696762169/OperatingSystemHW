@@ -33,7 +33,7 @@ namespace OperatingSystemHW
             while (true)
             {
                 if (!initializing || !silenceInit)
-                    Console.Write($"{m_UserManager.Current.Name}`{m_UserManager.Current.Current}>");
+                    Console.Write($"{m_UserManager.Current.Name}`{m_FileManager.GetCurrentPath()}>");
                 string? command = Console.ReadLine();
                 if (string.IsNullOrEmpty(command))
                     continue;

@@ -18,13 +18,49 @@ namespace OperatingSystemHW.test
         public static StringReader BigFileInOut()
         {
             StringBuilder sb = new();
-            sb.Append("input OperatingSystemHW.exe test.exe\n");
-            //sb.Append("output test.exe test.exe\n");
-            //sb.Append("input OperatingSystemHW.exe test1.exe\n");
-            //sb.Append("output test1.exe test1.exe\n");
-            //sb.Append("input OperatingSystemHW.exe test2.exe\n");
-            //sb.Append("output test2.exe test2.exe\n");
-            sb.Append("end\n");
+            sb.AppendLine("input OperatingSystemHW.exe test.exe");
+            //sb.AppendLine("output test.exe test.exe");
+            //sb.AppendLine("input OperatingSystemHW.exe test1.exe");
+            //sb.AppendLine("output test1.exe test1.exe");
+            //sb.AppendLine("input OperatingSystemHW.exe test2.exe");
+            //sb.AppendLine("output test2.exe test2.exe");
+            //sb.AppendLine("end");
+            return new StringReader(sb.ToString());
+        }
+
+        /// <summary>
+        /// 文件创建测试
+        /// </summary>
+        /// <returns></returns>
+        public static StringReader CreateFile()
+        {
+            StringBuilder sb = new();
+            Random rand = new();
+
+            for (int i = 0; i < 20; ++i)
+            {
+                if (rand.Next() % 3 == 0)
+                    sb.AppendLine($"mkdir dir{rand.Next(i * 100, (i + 1) * 100)}{(rand.Next() % 2 == 0 ? "/" : "")}");
+                else
+                    sb.AppendLine($"touch file{rand.Next(i * 100, (i + 1) * 100)}");
+            }
+
+            for (int i = 0; i < 5; ++i)
+            {
+                sb.AppendLine($"mkdir in{i}");
+                sb.AppendLine($"cd in{i}");
+            }
+
+            for (int i = 0; i < 20; ++i)
+            {
+                if (rand.Next() % 3 == 0)
+                    sb.AppendLine($"mkdir dir{rand.Next(i * 100, (i + 1) * 100)}{(rand.Next() % 2 == 0 ? "/" : "")}");
+                else
+                    sb.AppendLine($"touch file{rand.Next(i * 100, (i + 1) * 100)}");
+            }
+
+            sb.AppendLine("cd /");
+            sb.AppendLine("end");
             return new StringReader(sb.ToString());
         }
     }

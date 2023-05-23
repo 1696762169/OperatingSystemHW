@@ -14,6 +14,8 @@ namespace OperatingSystemHW
     /// </summary>
     internal class FileManager : IFileManager
     {
+        public const string ROOT_NAME = "/";
+
         private readonly ISectorManager m_SectorManager;    // 文件块管理器
         private readonly IInodeManager m_InodeManager;      // Inode管理器
 
@@ -25,6 +27,16 @@ namespace OperatingSystemHW
             m_SectorManager = sectorManager;
             m_UserManager = userManager;
             m_InodeManager = inodeManager;
+
+            // 初始化根目录的 . 和 ..
+            if (!m_InodeManager.Formatting)
+                return;
+            using Inode root = m_InodeManager.GetInode(DiskManager.ROOT_INODE_NO);
+            OpenFile file = new OpenFile(root);
+            DirectoryEntry selfEntry = new Entry(DiskManager.ROOT_INODE_NO, "./").ToDirectoryEntry();
+            DirectoryEntry parentEntry = new Entry(DiskManager.ROOT_INODE_NO, "../").ToDirectoryEntry();
+            WriteStruct(file, ref selfEntry);
+            WriteStruct(file, ref parentEntry);
         }
 
         public OpenFile Open(string path)
@@ -42,6 +54,7 @@ namespace OperatingSystemHW
 
         public void CreateFile(string path)
         {
+            EnsureInternalName(path);
             if (PathUtility.IsDirectory(path))
                 throw new ArgumentException("路径不能是目录：" + path);
             string fileName = PathUtility.GetFileName(path);
@@ -74,6 +87,7 @@ namespace OperatingSystemHW
 
         public void DeleteFile(string path)
         {
+            EnsureInternalName(path);
             if (PathUtility.IsDirectory(path))
                 throw new ArgumentException("路径不能是目录：" + path);
             // 获取目标文件夹
@@ -120,6 +134,7 @@ namespace OperatingSystemHW
 
         public void CreateDirectory(string path)
         {
+            EnsureInternalName(path);
             // 检查是否已经有重名目录
             if (DirectoryExists(path))
                 throw new ArgumentException("已经有重名目录：" + path);
@@ -132,20 +147,27 @@ namespace OperatingSystemHW
             using OpenFile parent = Open(m_InodeManager.GetInode(GetDirInode(path)));
 
             // 获取一个空闲Inode
-            using Inode inode = m_InodeManager.GetEmptyInode();
+            using OpenFile dir = Open(m_InodeManager.GetEmptyInode());
 
             // 写入新的文件目录项
-            AddEntry(parent, new Entry(inode.number, dirName));
+            AddEntry(parent, new Entry(dir.inode.number, dirName));
+
+            // 添加 . 和 .. 目录
+            DirectoryEntry selfEntry = new Entry(dir.inode.number, "./").ToDirectoryEntry();
+            DirectoryEntry parentEntry = new Entry(parent.inode.number, "../").ToDirectoryEntry();
+            WriteStruct(dir, ref selfEntry);
+            WriteStruct(dir, ref parentEntry);
 
             // 更新Inode信息
-            inode.uid = (short)m_UserManager.Current.UserId;
-            m_InodeManager.UpdateInode(inode.number, inode);
+            dir.inode.uid = (short)m_UserManager.Current.UserId;
+            m_InodeManager.UpdateInode(dir.inode.number, dir.inode);
         }
 
         public void DeleteDirectory(string path, bool deleteSub)
         {
+            EnsureInternalName(path);
             // 获取待删除目录的父目录与自身
-            if (path.Trim() == "/")
+            if (path.Trim() == ROOT_NAME)
                 throw new ArgumentException("无法删除根目录");
             if (path.Trim() == m_UserManager.Current.Home)
                 throw new ArgumentException("无法删除用户主目录");
@@ -160,14 +182,14 @@ namespace OperatingSystemHW
             // 检查目录是否为空目录
             if (!deleteSub)
             {
-                if (GetEntries(dirInode).Any())
+                if (GetEntries(dirInode, false).Any())
                 {
                     throw new ArgumentException($"目录不是空目录，不可删除：{path}");
                 }
             }
 
             // 递归删除其子目录与文件
-            foreach (Entry entry in GetEntries(dirInode))
+            foreach (Entry entry in GetEntries(dirInode, false))
             {
                 string sub = PathUtility.Join(path, entry.name);
                 try
@@ -363,7 +385,7 @@ namespace OperatingSystemHW
         public IEnumerable<Entry> GetEntries()
         {
             using Inode inode = m_InodeManager.GetInode(m_UserManager.Current.CurrentNo);
-            return GetEntries(inode);
+            return GetEntries(inode, false);
         }
 
         public bool FileExists(string path)
@@ -404,6 +426,35 @@ namespace OperatingSystemHW
             {
                 throw new ArgumentException($"未找到路径：{path}");
             }
+        }
+
+        public string GetCurrentPath()
+        {
+            StringBuilder sb = new("/");
+            int curNo = m_UserManager.Current.CurrentNo;
+            while (curNo != DiskManager.ROOT_INODE_NO)
+            {
+                // 查找父目录
+                using Inode curInode = m_InodeManager.GetInode(curNo);
+                foreach (Entry entry in GetEntries(curInode, true))
+                {
+                    if (entry.name != "../")
+                        continue;
+                    curNo = entry.inodeNo;
+                    break;
+                }
+
+                // 查找当前文件目录名
+                using Inode parentInode = m_InodeManager.GetInode(curNo);
+                foreach (Entry entry in GetEntries(parentInode, false))
+                {
+                    if (entry.inodeNo != curInode.number)
+                        continue;
+                    sb.Insert(1, $"{entry.name}");
+                    break;
+                }
+            }
+            return sb.ToString();
         }
 
         #region 公共实现
@@ -518,7 +569,7 @@ namespace OperatingSystemHW
                 throw new ArgumentNullException(nameof(dirInode));
             if (string.IsNullOrEmpty(fileName))
                 throw new ArgumentException("文件名不能为空");
-            foreach (Entry entry in GetEntries(dirInode))
+            foreach (Entry entry in GetEntries(dirInode, false))
             {
                 if (entry.name != fileName)
                     continue;
@@ -548,7 +599,7 @@ namespace OperatingSystemHW
 
                 // 查找目录内容
                 bool find = false;
-                foreach (Entry entry in GetEntries(inode))
+                foreach (Entry entry in GetEntries(inode, true))
                 {
                     if (entry.name != PathUtility.ToDirectoryPath(item))
                         continue;
@@ -588,8 +639,12 @@ namespace OperatingSystemHW
         #endregion
 
         #region 目录项相关函数
-        // 查找目录中的所有目录项
-        private IEnumerable<Entry> GetEntries(Inode dirInode)
+        /// <summary>
+        /// 查找目录中的所有目录项
+        /// </summary>
+        /// <param name="dirInode">目录Inode</param>
+        /// <param name="getDefault">是否获取 . 和 .. 两个默认目录项</param>
+        private IEnumerable<Entry> GetEntries(Inode dirInode, bool getDefault)
         {
             int readCount = dirInode.size / Marshal.SizeOf<DirectoryEntry>();
             DirectoryEntry[] buffer = new DirectoryEntry[DiskManager.SECTOR_SIZE / Marshal.SizeOf<DirectoryEntry>()];
@@ -602,7 +657,11 @@ namespace OperatingSystemHW
                 int readNumber = Math.Min(readCount, DiskManager.SECTOR_SIZE / Marshal.SizeOf<DirectoryEntry>());
                 m_SectorManager.ReadArray(sector, buffer, 0, readNumber);
                 for (int i = 0; i < readNumber; ++i)
-                    yield return new Entry(buffer[i]);
+                {
+                    Entry entry = new Entry(buffer[i]);
+                    if (getDefault || entry.name != "./" && entry.name != "../")
+                        yield return entry;
+                }
                 readCount -= readNumber;
             }
         }
@@ -620,7 +679,7 @@ namespace OperatingSystemHW
         {
             // 获取移除位置
             int dirSize = Marshal.SizeOf<DirectoryEntry>();
-            int writePosition = GetEntries(dir.inode)
+            int writePosition = GetEntries(dir.inode, false)
                 .TakeWhile(entry => entry.inodeNo != inodeNo)
                 .Sum(_ => dirSize);
 
@@ -647,6 +706,12 @@ namespace OperatingSystemHW
                 cutSectors.ForEach(sector => sector.Dispose());
                 throw new Exception($"移除目录项失败：\n{e.Message}");
             }
+        }
+
+        private void EnsureInternalName(string path)
+        {
+            if (PathUtility.ToDirectoryPath(PathUtility.GetFileName(path)) is "./" or "../")
+                throw new ArgumentException("参数不可为内置目录名 . 或 ..");
         }
         #endregion
     }

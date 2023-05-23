@@ -1,4 +1,4 @@
-﻿#define DEBUG_CHECK_FREE
+﻿//#define DEBUG_CHECK_FREE
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -32,9 +32,10 @@ namespace OperatingSystemHW
         } // 空闲Inode数量
         private readonly HashSet<int> m_InodeLocks = new(); // Inode被进程占用情况记录
 
-
         private readonly IDiskManager m_DiskManager;    // 磁盘管理器
         private readonly ISuperBlockManager m_SuperBlockManager;    // 超级块管理器
+
+        public bool Formatting { get; set; } = false; // 标识是否需要格式化 由FileManager使用
 
         public BlockManager(IDiskManager diskManager, ISuperBlockManager superBlockManager)
         {
@@ -43,7 +44,10 @@ namespace OperatingSystemHW
 
             // 如有必要 格式化硬盘
             if (m_SuperBlockManager.Sb.GetSignature() != "Made by JYX")
+            {
                 FormatDisk();
+                Formatting = true;
+            }
 
             // 设置已使用块（超级块必定被使用）与Inode
             for (int i = DiskManager.SUPER_BLOCK_SECTOR; i < DiskManager.SUPER_BLOCK_SECTOR + DiskManager.SUPER_BLOCK_SIZE; ++i)

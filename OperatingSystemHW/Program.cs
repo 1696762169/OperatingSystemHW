@@ -1,4 +1,5 @@
-﻿using System.Runtime.InteropServices;
+﻿using System.Diagnostics;
+using System.Runtime.InteropServices;
 using OperatingSystemHW.test;
 using System.Linq;
 using System.Text;
@@ -11,18 +12,21 @@ namespace OperatingSystemHW
         {
             Console.InputEncoding = Encoding.UTF8;
             Console.OutputEncoding = Encoding.UTF8;
+            //Console.InputEncoding = Encoding.Default;
+            //Console.OutputEncoding = Encoding.Default;
 
             const string FILE_PATH = "disk.img";
 
-            using DiskManager diskManager = new(FILE_PATH);
-            //using DiskManager diskManager = new(FILE_PATH, true);
+            //using DiskManager diskManager = new(FILE_PATH);
+            using DiskManager diskManager = new(FILE_PATH, true);
             FileSystem fileSystem = new(diskManager);
             BlockManager blockManager = new(diskManager, fileSystem);
             FileManager fileManager = new(blockManager, blockManager, fileSystem);
 
             View view = new(fileManager);
-            view.Start();
+            //view.Start();
             //view.Start(InitialInput.BigFileInOut());
+            view.Start(InitialInput.CreateFile());
         }
     }
 }
