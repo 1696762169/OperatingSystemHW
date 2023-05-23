@@ -1,4 +1,5 @@
 ﻿//#define DEBUG_CHECK_FREE
+#define DEBUG_SECTOR
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -36,6 +37,7 @@ namespace OperatingSystemHW
         private readonly ISuperBlockManager m_SuperBlockManager;    // 超级块管理器
 
         public bool Formatting { get; set; } = false; // 标识是否需要格式化 由FileManager使用
+        public static bool SectorDebug { get; set; }
 
         public BlockManager(IDiskManager diskManager, ISuperBlockManager superBlockManager)
         {
@@ -101,6 +103,10 @@ namespace OperatingSystemHW
 
         public Sector GetSector(int sectorNo)
         {
+#if DEBUG_SECTOR
+            if (SectorDebug)
+                Console.WriteLine($"申请了扇区 {sectorNo} 权限");
+#endif
             if (m_SectorLocks.Contains(sectorNo))
                 throw new UnauthorizedAccessException($"扇区 {sectorNo} 已被使用");
             m_SectorLocks.Add(sectorNo);
@@ -109,6 +115,10 @@ namespace OperatingSystemHW
 
         public void PutSector(Sector sector)
         {
+#if DEBUG_SECTOR
+            if (SectorDebug)
+                Console.WriteLine($"释放了扇区 {sector.number} 权限");
+#endif
             m_SectorLocks.Remove(sector.number);
         }
 

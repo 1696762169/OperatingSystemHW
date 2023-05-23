@@ -176,8 +176,8 @@ namespace OperatingSystemHW
             if (!DirectoryExists(path))
                 throw new DirectoryNotFoundException("目录不存在：" + path);
 
-            using Inode dirInode = m_InodeManager.GetInode(GetDirInode(PathUtility.ToDirectoryPath(path)));
-            using OpenFile parent = Open(m_InodeManager.GetInode(GetDirInode(PathUtility.ToFilePath(path))));
+            int dirInodeNo = GetDirInode(PathUtility.ToDirectoryPath(path));
+            Inode dirInode = m_InodeManager.GetInode(dirInodeNo);
 
             // 检查目录是否为空目录
             if (!deleteSub)
@@ -188,8 +188,10 @@ namespace OperatingSystemHW
                 }
             }
 
-            // 递归删除其子目录与文件
-            foreach (Entry entry in GetEntries(dirInode, false))
+            // 递归删除其子目录与文件（需要暂时释放当前目录）
+            List<Entry> entries = new List<Entry>(GetEntries(dirInode, false));
+            dirInode.Dispose();
+            foreach (Entry entry in entries)
             {
                 string sub = PathUtility.Join(path, entry.name);
                 try
@@ -205,7 +207,8 @@ namespace OperatingSystemHW
                 }
             }
 
-            // 删除此目录
+            // 删除此目录（重新获得当前目录）
+            dirInode = m_InodeManager.GetInode(dirInodeNo);
             List<Sector> dirSectors = new();
             try
             {
@@ -214,6 +217,7 @@ namespace OperatingSystemHW
                     .Select(pair => m_SectorManager.GetSector(pair.sectorNo)));
 
                 // 删除文件目录项（可能失败）
+                using OpenFile parent = Open(m_InodeManager.GetInode(GetDirInode(PathUtility.ToFilePath(path))));
                 RemoveEntry(parent, dirInode.number);
 
                 // 释放文件占用磁盘空间
@@ -658,12 +662,13 @@ namespace OperatingSystemHW
                 m_SectorManager.ReadArray(sector, buffer, 0, readNumber);
                 for (int i = 0; i < readNumber; ++i)
                 {
-                    Entry entry = new Entry(buffer[i]);
+                    Entry entry = new(buffer[i]);
                     if (getDefault || entry.name != "./" && entry.name != "../")
                         yield return entry;
                 }
                 readCount -= readNumber;
             }
+            //Console.WriteLine($"-----获取文件扇区访问权限：{string.Join(',', fileSectors.Select(sector => sector.number.ToString()))}");
         }
         // 添加目录项
         private void AddEntry(OpenFile dir, Entry entry)
@@ -679,7 +684,7 @@ namespace OperatingSystemHW
         {
             // 获取移除位置
             int dirSize = Marshal.SizeOf<DirectoryEntry>();
-            int writePosition = GetEntries(dir.inode, false)
+            int writePosition = GetEntries(dir.inode, true)
                 .TakeWhile(entry => entry.inodeNo != inodeNo)
                 .Sum(_ => dirSize);
 
@@ -687,12 +692,13 @@ namespace OperatingSystemHW
             List<Sector> cutSectors = new();
             try
             {
-                cutSectors.AddRange(CutFile(dir, dir.inode.size - dirSize));
-
                 // 读取后续的目录项覆盖至移除位置
                 byte[] buffer = new byte[dir.inode.size - writePosition - dirSize];
                 Seek(dir, writePosition + dirSize);
                 ReadBytes(dir, buffer);
+                // 申请待释放扇区权限 以防释放失败
+                cutSectors.AddRange(CutFile(dir, dir.inode.size - dirSize));
+                // 申请到权限后再写入内容到无需释放扇区
                 Seek(dir, writePosition);
                 WriteBytes(dir, buffer);
 

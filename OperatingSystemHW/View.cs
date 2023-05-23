@@ -75,6 +75,9 @@ namespace OperatingSystemHW
                         break;
                     case "quit" or "exit":  // 退出应用
                         return;
+                    case "debug":   // 是否开启Debug
+                        BlockManager.SectorDebug = args is ["on"];
+                        break;
                     case "end": // 初始输入结束
                         Console.SetIn(std);
                         initializing = false;
@@ -126,9 +129,9 @@ namespace OperatingSystemHW
         // 删除文件夹
         private void DeleteDirectory(IReadOnlyList<string> args)
         {
-            if (args.Count != 1)
-                throw new ArgumentException($"参数数量错误，应为 1 个参数，实际得到 {args.Count} 个");
-            m_FileManager.DeleteDirectory(args[0], false);
+            if (args.Count != 1 && args.Count != 2)
+                throw new ArgumentException($"参数数量错误，应为 1/2 个参数，实际得到 {args.Count} 个");
+            m_FileManager.DeleteDirectory(args[0], args is [_, "-r"]);
         }
 
         // 更改当前工作文件夹

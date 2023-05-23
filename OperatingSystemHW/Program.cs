@@ -24,6 +24,7 @@ namespace OperatingSystemHW
             FileManager fileManager = new(blockManager, blockManager, fileSystem);
 
             View view = new(fileManager);
+
             //view.Start();
             //view.Start(InitialInput.BigFileInOut());
             view.Start(InitialInput.CreateFile());
