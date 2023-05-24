@@ -34,6 +34,9 @@ namespace OperatingSystemHW
         public int size;            // 文件大小，字节为单位
         public int[] address = new int[10];      // 用于文件逻辑块号和物理块号转换的基本索引表
 
+        public int accessTime;      // 访问时间
+        public int modifyTime;      // 修改时间
+
         public readonly int number;  // Inode序号
         private readonly IInodeManager m_InodeManager;  // 用于释放资源的InodeManager
         public Inode(DiskInode diskInode, int number, IInodeManager inodeManager)
@@ -51,6 +54,9 @@ namespace OperatingSystemHW
                 Marshal.Copy((IntPtr)diskInode.address, address, 0, 10);
             }
 
+            accessTime = diskInode.accessTime;
+            modifyTime = diskInode.modifyTime;
+
             this.number = number;
             m_InodeManager = inodeManager;
         }
@@ -67,8 +73,8 @@ namespace OperatingSystemHW
                 uid = this.uid,
                 gid = this.gid,
                 size = this.size,
-                dummyAccessTime = Utility.Time,
-                dummyModifyTime = Utility.Time,
+                accessTime = this.accessTime,
+                modifyTime = this.modifyTime,
             };
             unsafe
             {

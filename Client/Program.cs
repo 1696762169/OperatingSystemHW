@@ -21,7 +21,7 @@ namespace Client
             while (_Connected)
             {
                 string? command = Console.ReadLine();
-                if (!_CanSend || string.IsNullOrEmpty(command))
+                if (!_CanSend)
                 {
                     continue;
                 }
@@ -35,10 +35,9 @@ namespace Client
         }
 
         // 向服务器发送消息
-        private static void Send(NetworkStream stream, string msg)
+        private static void Send(NetworkStream stream, string? msg)
         {
-            if (string.IsNullOrEmpty(msg))
-                return;
+            msg ??= "";
             stream.Write(new StringMsg(msg).ToBytes());
         }
 

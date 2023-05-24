@@ -13,6 +13,12 @@ namespace OperatingSystemHW
         private static readonly DateTime _StartTime = new (1970, 1, 1);
         public static int Time => (int)DateTime.Now.Subtract(_StartTime).TotalSeconds;
 
+        public static string ToTime(int time)
+        {
+            DateTime dt = _StartTime.AddSeconds(time);
+            return dt.ToString("u");
+        }
+
         public static byte[] EncodeString(string str) => Encoding.UTF8.GetBytes(str);
         public static byte[] EncodeString(string str, int size)
         {

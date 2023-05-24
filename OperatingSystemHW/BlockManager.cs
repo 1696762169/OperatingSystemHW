@@ -1,5 +1,5 @@
-﻿//#define DEBUG_CHECK_FREE
-#define DEBUG_SECTOR
+﻿#define DEBUG_CHECK_FREE
+//#define DEBUG_SECTOR
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -93,9 +93,11 @@ namespace OperatingSystemHW
         {
             lock (m_SectorMutex)
             {
-                if (FreeDataSector <= 0)
+                if (FreeDataSector - m_SectorLocks.Count <= 0)
                     throw new Exception("磁盘已满");
                 // 查找一个磁盘中未使用 且 未被其它进程占用的扇区
+                if (m_SearchFreeSector >= m_SectorUsed.Length)
+                    m_SearchFreeSector = DiskManager.DATA_START_SECTOR;
                 while (m_SectorUsed[m_SearchFreeSector] || m_SectorLocks.Contains(m_SearchFreeSector))
                 {
                     ++m_SearchFreeSector;
@@ -204,9 +206,11 @@ namespace OperatingSystemHW
         {
             lock (m_InodeMutex)
             {
-                if (FreeInode <= 0)
+                if (FreeInode - m_InodeLocks.Count <= 0)
                     throw new Exception("没有空闲的Inode");
                 // 查找一个磁盘中未使用 且 未被其它进程占用的Inode
+                if (m_SearchFreeInode >= m_InodeUsed.Length)
+                    m_SearchFreeInode = 1;
                 while (m_InodeUsed[m_SearchFreeInode] || m_InodeLocks.Contains(m_SearchFreeInode))
                 {
                     ++m_SearchFreeInode;
@@ -262,6 +266,7 @@ namespace OperatingSystemHW
                     m_SuperBlockManager.UpdateSuperBlock();
                 }
             }
+            
             DiskInode diskInode = inode.ToDiskInode();
             WriteDiskInode(inodeNo, ref diskInode);
         }
@@ -386,7 +391,7 @@ namespace OperatingSystemHW
             inode.linkCount = 1;
             inode.uid = DiskUser.SUPER_USER_ID;
             inode.gid = DiskUser.DEFAULT_GROUP_ID;
-            inode.dummyAccessTime = inode.dummyModifyTime = Utility.Time;
+            inode.accessTime = inode.modifyTime = Utility.Time;
             m_DiskManager.Write(DiskManager.INODE_START_SECTOR * DiskManager.SECTOR_SIZE + DiskManager.ROOT_INODE_NO * Marshal.SizeOf<DiskInode>(), ref inode);
         }
     }

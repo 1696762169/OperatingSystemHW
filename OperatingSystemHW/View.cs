@@ -16,16 +16,19 @@ namespace OperatingSystemHW
     {
         public User User { get; }
 
+        private readonly ISuperBlockManager m_SuperBlockManager;
         private readonly IUserManager m_UserManager;
         private readonly IFileManager m_FileManager;
 
         private readonly MsgParser m_MsgParser = new();
 
-        private bool m_Exit;
-        private bool m_EndInitializing;
+        private bool m_Exit;    // 是否退出
+        private bool m_EndInitializing; // 是否结束初始输入
+        private readonly byte[] m_Buffer = new byte[4096];  // 读写数组
 
-        public View(IUserManager userManager, IFileManager fileManager)
+        public View(ISuperBlockManager superBlockManager, IUserManager userManager, IFileManager fileManager)
         {
+            m_SuperBlockManager = superBlockManager;
             m_UserManager = userManager;
             User = userManager.GetUser(DiskUser.SUPER_USER_ID).Copy();
             m_FileManager = fileManager;
@@ -73,7 +76,7 @@ namespace OperatingSystemHW
         public void Start(TcpClient client)
         {
             NetworkStream stream = client.GetStream();
-            Send(stream, $"{User.Name}`{m_FileManager.GetCurrentPath()}>");
+            Send(stream, $"连接服务器成功\n{User.Name}`{m_FileManager.GetCurrentPath()}>");
             byte[] buffer = new byte[1024];
             m_Exit = false;
             while (!m_Exit)
@@ -104,14 +107,18 @@ namespace OperatingSystemHW
                                 stream.Write(new ExitMsg().ToBytes());
                                 return;
                             }
-                            Send(stream,$"{User.Name}`{m_FileManager.GetCurrentPath()}>");
+                        }
+                        catch (UnauthorizedAccessException e)
+                        {
+                            // 发送占用错误
+                            Send(stream, e.Message + "\n", ConsoleColor.Yellow);
                         }
                         catch (Exception e)
                         {
                             // 发送错误
-                            Send(stream, e.Message + "\n");
-                            Send(stream, $"{User.Name}`{m_FileManager.GetCurrentPath()}>");
+                            Send(stream, e.Message + "\n", ConsoleColor.DarkRed);
                         }
+                        Send(stream,$"{User.Name}`{m_FileManager.GetCurrentPath()}>");
                         break;
                     }
                 }
@@ -121,7 +128,7 @@ namespace OperatingSystemHW
         // 处理指令
         private void ProcessCommand(string? command, NetworkStream? stream = null)
         {
-            if (string.IsNullOrEmpty(command))
+            if (string.IsNullOrWhiteSpace(command))
                 return;
 
             string[] split = command.Split(' ');
@@ -144,6 +151,12 @@ namespace OperatingSystemHW
                 break;
             case "clear":
                 stream.Write(new ClearMsg().ToBytes());
+                break;
+            case "cat":
+                ShowFile(args, stream);
+                break;
+            case "stat":
+                ShowFileState(args, stream);
                 break;
             default:
                 ProcessSilenceCommand(cmd, args);
@@ -282,9 +295,8 @@ namespace OperatingSystemHW
             m_FileManager.CreateFile(args[1]);
 
             // 打开文件进行写入
-            OpenFile file = m_FileManager.Open(args[1]);
+            using OpenFile file = m_FileManager.Open(args[1]);
             m_FileManager.WriteBytes(file, File.ReadAllBytes(args[0]));
-            m_FileManager.Close(file);
         }
         // 将二级文件系统中的文件移出
         private void MoveFileIOut(IReadOnlyList<string> args)
@@ -301,11 +313,46 @@ namespace OperatingSystemHW
                 File.Create(args[1]).Close();
 
             // 打开文件读出内容
-            OpenFile file = m_FileManager.Open(args[0]);
+            using OpenFile file = m_FileManager.Open(args[0]);
             byte[] buffer = new byte[file.inode.size];
             m_FileManager.ReadBytes(file, buffer);
-            m_FileManager.Close(file);
             File.WriteAllBytes(args[1], buffer);
+        }
+
+        // 通过网络方式预览文本文件内容
+        private void ShowFile(IReadOnlyList<string> args, NetworkStream stream)
+        {
+            if (args.Count != 1)
+                throw new ArgumentException($"参数数量错误，应为 1 个参数，实际得到 {args.Count} 个");
+            using OpenFile file = m_FileManager.Open(args[0]);
+            if (file.inode.size == 0)
+                throw new Exception("文件为空");
+            m_FileManager.ReadBytes(file, m_Buffer, file.inode.size);
+            Send(stream, Encoding.UTF8.GetString(m_Buffer, 0, Math.Min(file.inode.size, m_Buffer.Length)) + "\n");
+            if (file.inode.size > m_Buffer.Length)
+                Send(stream, $"-----文件过大，仅展示前{m_Buffer.Length}个字节的内容-----\n", ConsoleColor.Yellow);
+
+        }
+        // 通过网络方式查看文件Inode信息
+        private void ShowFileState(IReadOnlyList<string> args, NetworkStream stream)
+        {
+            if (args.Count != 1 && args.Count != 0)
+                throw new ArgumentException($"参数数量错误，应为 0/1 个参数，实际得到 {args.Count} 个");
+            if (args.Count != 1)
+            {
+                Send(stream, $"剩余空间大小：{m_SuperBlockManager.Sb.FreeCount * DiskManager.SECTOR_SIZE / 1024.0f:F1}KB\n" +
+                             $"剩余数据扇区数量：{m_SuperBlockManager.Sb.FreeCount}\n" +
+                             $"剩余空间比例：{(float)m_SuperBlockManager.Sb.FreeCount / m_SuperBlockManager.Sb.DataSector:P}\n" +
+                             $"剩余Inode数量：{m_SuperBlockManager.Sb.FreeInode}\n");
+            }
+            else
+            {
+                using OpenFile file = m_FileManager.Open(args[0], false);
+                Send(stream, $"文件名：{args[0]}\n" +
+                             $"文件大小：{file.inode.size,-12} 文件Inode编号：{file.inode.number}\n" +
+                             $"最后访问时间：{Utility.ToTime(file.inode.accessTime)}\n" +
+                             $"最后修改时间：{Utility.ToTime(file.inode.modifyTime)}\n");
+            }
         }
         #endregion
 

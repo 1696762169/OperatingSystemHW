@@ -23,7 +23,7 @@ namespace OperatingSystemHW
         /// <summary>
         /// 打开文件
         /// </summary>
-        public OpenFile Open(string path);
+        public OpenFile Open(string path, bool access = true);
         /// <summary>
         /// 关闭文件
         /// </summary>
@@ -51,7 +51,7 @@ namespace OperatingSystemHW
         /// <summary>
         /// 从文件读取二进制数据
         /// </summary>
-        public void ReadBytes(OpenFile file, byte[] data);
+        public void ReadBytes(OpenFile file, byte[] data, int size = -1);
         /// <summary>
         /// 写入二进制数据到文件
         /// </summary>

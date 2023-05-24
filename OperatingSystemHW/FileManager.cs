@@ -30,16 +30,21 @@ namespace OperatingSystemHW
             if (!m_InodeManager.Formatting)
                 return;
             using Inode root = m_InodeManager.GetInode(DiskManager.ROOT_INODE_NO);
-            OpenFile file = new OpenFile(root);
+            OpenFile file = new(root);
             DirectoryEntry selfEntry = new Entry(DiskManager.ROOT_INODE_NO, "./").ToDirectoryEntry();
             DirectoryEntry parentEntry = new Entry(DiskManager.ROOT_INODE_NO, "../").ToDirectoryEntry();
             WriteStruct(file, ref selfEntry);
             WriteStruct(file, ref parentEntry);
         }
 
-        public OpenFile Open(string path)
+        public OpenFile Open(string path, bool access = true)
         {
             Inode inode = m_InodeManager.GetInode(GetFileInode(path));
+            if (access)
+            {
+                inode.accessTime = Utility.Time;
+                m_InodeManager.UpdateInode(inode.number, inode);
+            }
             // 打开文件即申请Inode使用权
             return new OpenFile(inode);
         }
@@ -73,14 +78,14 @@ namespace OperatingSystemHW
             }
             
             // 获取一个空闲Inode
-            using Inode inode = m_InodeManager.GetEmptyInode();
+            using OpenFile file = Open(m_InodeManager.GetEmptyInode());
 
             // 写入新的文件目录项
-            AddEntry(dir, new Entry(inode.number, PathUtility.GetFileName(path)));
+            AddEntry(dir, new Entry(file.inode.number, PathUtility.GetFileName(path)));
 
             // 更新Inode信息
-            inode.uid = (short)CurrentUser.UserId;
-            m_InodeManager.UpdateInode(inode.number, inode);
+            file.inode.uid = (short)CurrentUser.UserId;
+            m_InodeManager.UpdateInode(file.inode.number, file.inode);
         }
 
         public void DeleteFile(string path)
@@ -106,9 +111,9 @@ namespace OperatingSystemHW
             try
             {
                 // 获取文件Inode权限
-                using Inode fileInode = m_InodeManager.GetInode(fileInodeNo);
+                using OpenFile file = Open(m_InodeManager.GetInode(fileInodeNo));
                 // 获取文件扇区访问权限
-                fileSectors.AddRange(fileInode.GetUsedSectors(m_SectorManager)
+                fileSectors.AddRange(file.inode.GetUsedSectors(m_SectorManager)
                     .Select(pair => m_SectorManager.GetSector(pair.sectorNo)));
 
                 // 删除文件目录项（可能失败）
@@ -117,8 +122,8 @@ namespace OperatingSystemHW
                 // 释放文件占用磁盘空间
                 m_SectorManager.ClearSector(fileSectors.ToArray());
                 // 释放文件Inode（将文件所有者修改为无效值0）
-                fileInode.Clear();
-                m_InodeManager.UpdateInode(fileInodeNo, fileInode);
+                file.inode.Clear();
+                m_InodeManager.UpdateInode(fileInodeNo, file.inode);
             }
             catch (UnauthorizedAccessException e)
             {
@@ -175,20 +180,21 @@ namespace OperatingSystemHW
                 throw new DirectoryNotFoundException("目录不存在：" + path);
 
             int dirInodeNo = GetDirInode(PathUtility.ToDirectoryPath(path));
-            Inode dirInode = m_InodeManager.GetInode(dirInodeNo);
+            OpenFile dir = Open(m_InodeManager.GetInode(dirInodeNo));
 
             // 检查目录是否为空目录
             if (!deleteSub)
             {
-                if (GetEntries(dirInode, false).Any())
+                if (GetEntries(dir.inode, false).Any())
                 {
+                    dir.inode.Dispose();
                     throw new ArgumentException($"目录不是空目录，不可删除：{path}");
                 }
             }
 
             // 递归删除其子目录与文件（需要暂时释放当前目录）
-            List<Entry> entries = new List<Entry>(GetEntries(dirInode, false));
-            dirInode.Dispose();
+            List<Entry> entries = new(GetEntries(dir.inode, false));
+            dir.inode.Dispose();
             foreach (Entry entry in entries)
             {
                 string sub = PathUtility.Join(path, entry.name);
@@ -206,23 +212,23 @@ namespace OperatingSystemHW
             }
 
             // 删除此目录（重新获得当前目录）
-            dirInode = m_InodeManager.GetInode(dirInodeNo);
+            dir = Open(m_InodeManager.GetInode(dirInodeNo));
             List<Sector> dirSectors = new();
             try
             {
                 // 获取文件扇区访问权限
-                dirSectors.AddRange(dirInode.GetUsedSectors(m_SectorManager)
+                dirSectors.AddRange(dir.inode.GetUsedSectors(m_SectorManager)
                     .Select(pair => m_SectorManager.GetSector(pair.sectorNo)));
 
                 // 删除文件目录项（可能失败）
                 using OpenFile parent = Open(m_InodeManager.GetInode(GetDirInode(PathUtility.ToFilePath(path))));
-                RemoveEntry(parent, dirInode.number);
+                RemoveEntry(parent, dir.inode.number);
 
                 // 释放文件占用磁盘空间
                 m_SectorManager.ClearSector(dirSectors.ToArray());
                 // 释放文件Inode（将文件所有者修改为无效值0）
-                dirInode.Clear();
-                m_InodeManager.UpdateInode(dirInode.number, dirInode);
+                dir.inode.Clear();
+                m_InodeManager.UpdateInode(dir.inode.number, dir.inode);
             }
             catch (UnauthorizedAccessException e)
             {
@@ -234,11 +240,12 @@ namespace OperatingSystemHW
             }
         }
 
-        public void ReadBytes(OpenFile file, byte[] data)
+        public void ReadBytes(OpenFile file, byte[] data, int size = -1)
         {
-            if (data.Length == 0)
+            int readLength = size < 0 ? data.Length : Math.Min(size, data.Length);
+            if (readLength <= 0)
                 return;
-            List<Sector> sectors = ReadPrepare(file, data.Length);
+            List<Sector> sectors = ReadPrepare(file, readLength);
             const int SECTOR_SIZE = DiskManager.SECTOR_SIZE;
             byte[] buffer = new byte[SECTOR_SIZE];
             try
@@ -247,7 +254,7 @@ namespace OperatingSystemHW
                 int index = 0;
                 if (sectors.Count > 0)
                 {
-                    int readCount = Math.Min(SECTOR_SIZE - file.pointer % SECTOR_SIZE, data.Length);
+                    int readCount = Math.Min(SECTOR_SIZE - file.pointer % SECTOR_SIZE, readLength);
                     m_SectorManager.ReadBytes(sectors[0], data, readCount, file.pointer % SECTOR_SIZE);
                     index += readCount;
                     file.pointer += readCount;
@@ -263,7 +270,7 @@ namespace OperatingSystemHW
                 // 读入最后一块
                 if (sectors.Count > 1)
                 {
-                    int readCount = data.Length - index;
+                    int readCount = readLength - index;
                     m_SectorManager.ReadBytes(sectors[^1], buffer, readCount);
                     Array.Copy(buffer, 0, data, index, readCount);
                     file.pointer += readCount;
@@ -386,8 +393,8 @@ namespace OperatingSystemHW
 
         public IEnumerable<Entry> GetEntries()
         {
-            using Inode inode = m_InodeManager.GetInode(CurrentUser.CurrentNo);
-            return GetEntries(inode, false);
+            using OpenFile dir = Open(m_InodeManager.GetInode(CurrentUser.CurrentNo));
+            return GetEntries(dir.inode, false);
         }
 
         public bool FileExists(string path)
@@ -548,6 +555,7 @@ namespace OperatingSystemHW
             }
             // 更新文件大小
             file.inode.size = newSize;
+            file.inode.accessTime = file.inode.modifyTime = Utility.Time;
             m_InodeManager.UpdateInode(file.inode.number, file.inode);
             return contentSectors;
         }
