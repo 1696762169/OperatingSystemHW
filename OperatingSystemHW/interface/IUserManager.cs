@@ -11,23 +11,19 @@ namespace OperatingSystemHW
     /// </summary>
     internal interface IUserManager
     {
-        public User Current { get; }   // 当前用户
-        public int CurrentIndex { get; }   // 当前用户
-        public void SetCurrent(int index);  // 设置当前用户
-
         /// <summary>
         /// 获取一个用户信息
         /// </summary>
-        public User GetUser(int index);
+        public User GetUser(int uid);
         /// <summary>
         /// 更新一个用户信息
         /// </summary>
-        public void UpdateUser(int index);
+        public void UpdateUser(int uid);
         /// <summary>
         /// 设置一个用户信息
         /// </summary>
         /// <param name="user"></param>
-        /// <param name="index"></param>
-        public void SetUser(User user, int index);
+        /// <param name="uid"></param>
+        public void SetUser(User user, int uid);
     }
 }

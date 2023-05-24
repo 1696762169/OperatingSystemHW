@@ -17,9 +17,8 @@ namespace OperatingSystemHW
         private SuperBlock m_SuperBlock;
         private readonly byte[] m_UpdateBuffer = new byte[SuperBlock.NO_USER_SIZE];
 
-        public User Current => m_Users[CurrentIndex];
-        public int CurrentIndex { get; private set; } = 0;
         private readonly User[] m_Users = new User[SuperBlock.MAX_USER_COUNT]; // 用户信息
+        private readonly Dictionary<int, int> m_IdToIndex = new();  // 用户ID到用户序号的映射表
 
         private readonly IDiskManager m_DiskManager;  // 磁盘管理器
 
@@ -45,8 +44,10 @@ namespace OperatingSystemHW
             for (int i = 0; i < m_SuperBlock.UserCount; i++)
             {
                 DiskUser diskUser = m_SuperBlock.GetUser(i);
-                if (diskUser.uid != 0)
-                    m_Users[i] = new User(diskUser);
+                if (diskUser.uid == 0)
+                    continue;
+                m_Users[i] = new User(diskUser);
+                m_IdToIndex[diskUser.uid] = i;
             }
         }
 
@@ -65,34 +66,27 @@ namespace OperatingSystemHW
             }
         }
 
-        public void SetCurrent(int index)
+        public User GetUser(int uid)
         {
-            if (!CheckUserIndex(index))
-                throw new ArgumentOutOfRangeException(nameof(index));
-            CurrentIndex = index;
+            if (!CheckUserIndex(m_IdToIndex[uid]))
+                throw new ArgumentOutOfRangeException(nameof(uid));
+            return m_Users[m_IdToIndex[uid]];
         }
 
-        public User GetUser(int index)
+        public void UpdateUser(int uid)
         {
-            if (!CheckUserIndex(index))
-                throw new ArgumentOutOfRangeException(nameof(index));
-            return m_Users[index];
-        }
-
-        public void UpdateUser(int index)
-        {
-            if (!CheckUserIndex(index))
-                throw new ArgumentOutOfRangeException(nameof(index));
-            m_SuperBlock.SetUser(index, m_Users[index].ToDiskUser());
+            if (!CheckUserIndex(m_IdToIndex[uid]))
+                throw new ArgumentOutOfRangeException(nameof(uid));
+            m_SuperBlock.SetUser(m_IdToIndex[uid], m_Users[m_IdToIndex[uid]].ToDiskUser());
             m_DiskManager.Write(DiskManager.SUPER_BLOCK_SECTOR * DiskManager.SECTOR_SIZE, ref m_SuperBlock);
         }
 
-        public void SetUser(User user, int index)
+        public void SetUser(User user, int uid)
         {
-            if (!CheckUserIndex(index))
-                throw new ArgumentOutOfRangeException(nameof(index));
-            m_Users[index] = user;
-            m_SuperBlock.SetUser(index, m_Users[index].ToDiskUser());
+            if (!CheckUserIndex(m_IdToIndex[uid]))
+                throw new ArgumentOutOfRangeException(nameof(uid));
+            m_Users[m_IdToIndex[uid]] = user;
+            m_SuperBlock.SetUser(m_IdToIndex[uid], m_Users[m_IdToIndex[uid]].ToDiskUser());
             m_DiskManager.Write(DiskManager.SUPER_BLOCK_SECTOR * DiskManager.SECTOR_SIZE, ref m_SuperBlock);
         }
 

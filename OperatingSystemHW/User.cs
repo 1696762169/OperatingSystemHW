@@ -26,6 +26,8 @@ namespace OperatingSystemHW
 
         //public List<Entry> CurrentEntries { get; private set; } = new(); // 当前目录下的文件目录项
 
+        public User() { }
+
         public User(DiskUser diskUser)
         {
             UserId = diskUser.uid;
@@ -41,6 +43,9 @@ namespace OperatingSystemHW
                 Current = Utility.DecodeString(diskUser.current.name, DiskUser.NAME_MAX_COUNT);
             }
         }
+
+        public User Copy() => new(ToDiskUser());
+        
 
         /// <summary>
         /// 将此内存Inode的数据写入外存Inode结构

@@ -19,13 +19,11 @@ namespace OperatingSystemHW
         private readonly ISectorManager m_SectorManager;    // 文件块管理器
         private readonly IInodeManager m_InodeManager;      // Inode管理器
 
-        public IUserManager UserManager => m_UserManager;
-        private readonly IUserManager m_UserManager;        // 用户管理器
+        public User CurrentUser { get; set; } = new();
 
-        public FileManager(ISectorManager sectorManager, IInodeManager inodeManager, IUserManager userManager)
+        public FileManager(ISectorManager sectorManager, IInodeManager inodeManager)
         {
             m_SectorManager = sectorManager;
-            m_UserManager = userManager;
             m_InodeManager = inodeManager;
 
             // 初始化根目录的 . 和 ..
@@ -81,7 +79,7 @@ namespace OperatingSystemHW
             AddEntry(dir, new Entry(inode.number, PathUtility.GetFileName(path)));
 
             // 更新Inode信息
-            inode.uid = (short)m_UserManager.Current.UserId;
+            inode.uid = (short)CurrentUser.UserId;
             m_InodeManager.UpdateInode(inode.number, inode);
         }
 
@@ -159,7 +157,7 @@ namespace OperatingSystemHW
             WriteStruct(dir, ref parentEntry);
 
             // 更新Inode信息
-            dir.inode.uid = (short)m_UserManager.Current.UserId;
+            dir.inode.uid = (short)CurrentUser.UserId;
             m_InodeManager.UpdateInode(dir.inode.number, dir.inode);
         }
 
@@ -169,7 +167,7 @@ namespace OperatingSystemHW
             // 获取待删除目录的父目录与自身
             if (path.Trim() == ROOT_NAME)
                 throw new ArgumentException("无法删除根目录");
-            if (path.Trim() == m_UserManager.Current.Home)
+            if (path.Trim() == CurrentUser.Home)
                 throw new ArgumentException("无法删除用户主目录");
 
             // 检查是否存在目录
@@ -388,7 +386,7 @@ namespace OperatingSystemHW
 
         public IEnumerable<Entry> GetEntries()
         {
-            using Inode inode = m_InodeManager.GetInode(m_UserManager.Current.CurrentNo);
+            using Inode inode = m_InodeManager.GetInode(CurrentUser.CurrentNo);
             return GetEntries(inode, false);
         }
 
@@ -423,8 +421,7 @@ namespace OperatingSystemHW
             {
                 int inodeNo = GetDirInode(PathUtility.ToDirectoryPath(path));
                 string temp = PathUtility.ToFilePath(path);
-                m_UserManager.Current.ChangeDirectory(inodeNo, PathUtility.ToDirectoryPath(PathUtility.GetFileName(temp)));
-                m_UserManager.UpdateUser(m_UserManager.CurrentIndex);
+                CurrentUser.ChangeDirectory(inodeNo, PathUtility.ToDirectoryPath(PathUtility.GetFileName(temp)));
             }
             catch (DirectoryNotFoundException)
             {
@@ -435,7 +432,7 @@ namespace OperatingSystemHW
         public string GetCurrentPath()
         {
             StringBuilder sb = new("/");
-            int curNo = m_UserManager.Current.CurrentNo;
+            int curNo = CurrentUser.CurrentNo;
             while (curNo != DiskManager.ROOT_INODE_NO)
             {
                 // 查找父目录
@@ -587,8 +584,7 @@ namespace OperatingSystemHW
             if (string.IsNullOrEmpty(path))
                 throw new ArgumentException("路径不能为空");
             // 判断查找起点
-            User user = m_UserManager.Current;
-            int cur = path[0] == '/' ? user.HomeNo : user.CurrentNo;
+            int cur = path[0] == '/' ? CurrentUser.HomeNo : CurrentUser.CurrentNo;
 
             // 查找所有路径项
             List<string> pathItems = new(path.Split('/').Where(str => !string.IsNullOrEmpty(str)));

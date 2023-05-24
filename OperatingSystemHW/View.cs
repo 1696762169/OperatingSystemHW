@@ -14,18 +14,22 @@ namespace OperatingSystemHW
     /// </summary>
     internal class View
     {
-        private readonly IFileManager m_FileManager;
+        public User User { get; }
+
         private readonly IUserManager m_UserManager;
+        private readonly IFileManager m_FileManager;
 
         private readonly MsgParser m_MsgParser = new();
 
         private bool m_Exit;
         private bool m_EndInitializing;
 
-        public View(IFileManager fileManager)
+        public View(IUserManager userManager, IFileManager fileManager)
         {
+            m_UserManager = userManager;
+            User = userManager.GetUser(DiskUser.SUPER_USER_ID).Copy();
             m_FileManager = fileManager;
-            m_UserManager = fileManager.UserManager;
+            m_FileManager.CurrentUser = User;
         }
 
         /// <summary>
@@ -41,7 +45,7 @@ namespace OperatingSystemHW
             while (true)
             {
                 if (!initializing || !silenceInit)
-                    Console.Write($"{m_UserManager.Current.Name}`{m_FileManager.GetCurrentPath()}>");
+                    Console.Write($"{User.Name}`{m_FileManager.GetCurrentPath()}>");
                 string? command = Console.ReadLine();
 
                 try
@@ -69,7 +73,7 @@ namespace OperatingSystemHW
         public void Start(TcpClient client)
         {
             NetworkStream stream = client.GetStream();
-            Send(stream, $"{m_UserManager.Current.Name}`{m_FileManager.GetCurrentPath()}>");
+            Send(stream, $"{User.Name}`{m_FileManager.GetCurrentPath()}>");
             byte[] buffer = new byte[1024];
             m_Exit = false;
             while (!m_Exit)
@@ -100,13 +104,13 @@ namespace OperatingSystemHW
                                 stream.Write(new ExitMsg().ToBytes());
                                 return;
                             }
-                            Send(stream,$"{m_UserManager.Current.Name}`{m_FileManager.GetCurrentPath()}>");
+                            Send(stream,$"{User.Name}`{m_FileManager.GetCurrentPath()}>");
                         }
                         catch (Exception e)
                         {
                             // 发送错误
                             Send(stream, e.Message + "\n");
-                            Send(stream, $"{m_UserManager.Current.Name}`{m_FileManager.GetCurrentPath()}>");
+                            Send(stream, $"{User.Name}`{m_FileManager.GetCurrentPath()}>");
                         }
                         break;
                     }
@@ -259,6 +263,7 @@ namespace OperatingSystemHW
             if (args.Count != 1)
                 throw new ArgumentException($"参数数量错误，应为 1 个参数，实际得到 {args.Count} 个");
             m_FileManager.ChangeDirectory(args[0]);
+            m_UserManager.SetUser(User, User.UserId);
         }
 
         // 将文件移动到二级文件系统中
