@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Net.Sockets;
 using System.Text;
+using OperatingSystemHW.Msg;
 
 namespace Client
 {
@@ -55,8 +56,13 @@ namespace Client
                     switch (msg)
                     {
                     case StringMsg str:
+                        Console.ForegroundColor = str.color;
                         Console.Write(str.data);
+                        Console.ResetColor();
                         _CanSend = true;
+                        break;
+                    case ClearMsg:
+                        Console.Clear();
                         break;
                     case ExitMsg:
                         _Connected = false;

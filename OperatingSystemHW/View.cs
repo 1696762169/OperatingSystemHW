@@ -1,9 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
+using OperatingSystemHW.Msg;
 
 namespace OperatingSystemHW
 {
@@ -44,7 +46,7 @@ namespace OperatingSystemHW
 
                 try
                 {
-                    ProcessCommand(command, false);
+                    ProcessCommand(command);
                     if (m_Exit)
                         return;
                     if (m_EndInitializing)
@@ -91,7 +93,7 @@ namespace OperatingSystemHW
                         try
                         {
                             // 发送消息
-                            Send(stream, ProcessCommand(str.data, true));
+                            ProcessCommand(str.data, stream);
                             if (m_Exit)
                             {
                                 Send(stream, "成功退出服务器，连接已断开\n");
@@ -112,19 +114,60 @@ namespace OperatingSystemHW
             }
         }
 
-        private string ProcessCommand(string? command, bool whiteLs)
+        // 处理指令
+        private void ProcessCommand(string? command, NetworkStream? stream = null)
         {
             if (string.IsNullOrEmpty(command))
-                return "";
+                return;
 
             string[] split = command.Split(' ');
             string cmd = split[0];
             string[] args = split.Where((str, index) => index > 0 && !string.IsNullOrEmpty(str)).ToArray();
 
+            if (stream == null)
+                ProcessCommand(cmd, args);
+            else
+                ProcessCommand(cmd, args, stream);
+        }
+
+        // 网络模式处理返回结果的指令
+        private void ProcessCommand(string cmd, string[] args, NetworkStream stream)
+        {
             switch (cmd)
             {
             case "ls":
-                return whiteLs ? ShowEntriesWhite() : ShowEntries();
+                ShowEntries(stream);
+                break;
+            case "clear":
+                stream.Write(new ClearMsg().ToBytes());
+                break;
+            default:
+                ProcessSilenceCommand(cmd, args);
+                break;
+            }
+        }
+        // 控制台模式处理返回结果的指令
+        private void ProcessCommand(string cmd, string[] args)
+        {
+            switch (cmd)
+            {
+            case "ls":
+                ShowEntries();
+                break;
+            case "clear":
+                Console.Clear();
+                break;
+            default:
+                ProcessSilenceCommand(cmd, args);
+                break;
+            }
+        }
+
+        // 处理无需返回结果的指令
+        private void ProcessSilenceCommand(string cmd, string[] args)
+        {
+            switch (cmd)
+            {
             case "touch":
                 CreateFile(args);
                 break;
@@ -146,9 +189,6 @@ namespace OperatingSystemHW
             case "output":
                 MoveFileIOut(args);
                 break;
-            //case "clear":   // 清理屏幕输出
-            //    Console.Clear();
-            //    break;
             case "quit" or "exit":  // 退出应用
                 m_Exit = true;
                 break;
@@ -156,18 +196,16 @@ namespace OperatingSystemHW
                 BlockManager.SectorDebug = args is ["on"];
                 break;
             case "end": // 初始输入结束
-                //Console.SetIn(std);
                 m_EndInitializing = true;
                 break;
             default:    // 输入有误
                 throw new ArgumentException($"找不到命令：{cmd}");
             }
-
-            return "";
         }
 
+        #region 指令处理函数
         // 列出当前目录下的文件
-        private string ShowEntries()
+        private void ShowEntries()
         {
             foreach (Entry entry in m_FileManager.GetEntries())
             {
@@ -175,14 +213,14 @@ namespace OperatingSystemHW
                 Console.WriteLine(entry.name);
             }
             Console.ResetColor();
-            return "";
         }
-        private string ShowEntriesWhite()
+        private void ShowEntries(NetworkStream stream)
         {
-            StringBuilder sb = new();
             foreach (Entry entry in m_FileManager.GetEntries())
-                sb.AppendLine(entry.name);
-            return sb.ToString();
+            {
+                ConsoleColor color = PathUtility.IsDirectory(entry.name) ? ConsoleColor.Cyan : ConsoleColor.White;
+                Send(stream, entry.name + "\n", color);
+            }
         }
 
         // 创建文件
@@ -264,13 +302,14 @@ namespace OperatingSystemHW
             m_FileManager.Close(file);
             File.WriteAllBytes(args[1], buffer);
         }
+        #endregion
 
         // 向客户端发送消息
-        private static void Send(NetworkStream stream, string msg)
+        private static void Send(NetworkStream stream, string msg, ConsoleColor color = ConsoleColor.White)
         {
             if (string.IsNullOrEmpty(msg))
                 return;
-            stream.Write(new StringMsg(msg).ToBytes());
+            stream.Write(new StringMsg(msg, color).ToBytes());
         }
     }
 }

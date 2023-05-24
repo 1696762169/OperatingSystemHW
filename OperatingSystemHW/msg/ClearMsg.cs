@@ -7,12 +7,11 @@ using System.Threading.Tasks;
 namespace OperatingSystemHW.Msg
 {
     /// <summary>
-    /// 断开连接消息
+    /// 清空屏幕消息
     /// </summary>
-    public class ExitMsg : SerializeMsg
+    public class ClearMsg : SerializeMsg
     {
-        public override int MsgID => int.MinValue;
-
+        public override int MsgID => 2;
         public override int GetByteCount_Msg() => 0;
 
         protected override void ToBytesDetail_Msg() { }

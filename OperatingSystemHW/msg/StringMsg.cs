@@ -4,31 +4,42 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-public class StringMsg : SerializeMsg
+namespace OperatingSystemHW.Msg
 {
-    public override int MsgID => 1;
-    public string data;
-
-    public StringMsg() : this("") { }
-    public StringMsg(string data) => this.data = data;
-
-    public override int GetByteCount_Msg()
+    public class StringMsg : SerializeMsg
     {
-        return 4 + Encoding.UTF8.GetByteCount(data);
-    }
+        public override int MsgID => 1;
+        public string data;
+        public ConsoleColor color;
 
-    protected override void ToBytesDetail_Msg()
-    {
-        WriteByte(data);
-    }
+        public StringMsg() : this("") { }
 
-    protected override void ReadBytesDetail_Msg()
-    {
-        data = ReadString();
-    }
+        public StringMsg(string data, ConsoleColor color = ConsoleColor.White)
+        {
+            this.data = data;
+            this.color = color;
+        }
 
-    public override string ToString()
-    {
-        return data;
+        public override int GetByteCount_Msg()
+        {
+            return 4 + Encoding.UTF8.GetByteCount(data) + sizeof(ConsoleColor);
+        }
+
+        protected override void ToBytesDetail_Msg()
+        {
+            WriteByte(data);
+            WriteByte((int)color);
+        }
+
+        protected override void ReadBytesDetail_Msg()
+        {
+            data = ReadString();
+            color = (ConsoleColor)ReadInt();
+        }
+
+        public override string ToString()
+        {
+            return data;
+        }
     }
 }
