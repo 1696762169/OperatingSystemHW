@@ -13,6 +13,7 @@ namespace OperatingSystemHW
     {
         public readonly Inode inode;    // 文件对应的Inode
         public int pointer;             // 读写指针在文件中的位置
+        public bool Disposed { get; private set; }  // 文件是否已经关闭 用于User.OpenFiles
 
         public OpenFile(Inode inode)
         {
@@ -50,6 +51,7 @@ namespace OperatingSystemHW
         public void Dispose()
         {
             inode.Dispose();
+            Disposed = true;
         }
     }
 }

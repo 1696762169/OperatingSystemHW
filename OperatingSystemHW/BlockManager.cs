@@ -1,5 +1,6 @@
 ﻿#define DEBUG_CHECK_FREE
 //#define DEBUG_SECTOR
+//#define DEBUG_INODE
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -227,6 +228,9 @@ namespace OperatingSystemHW
             {
                 if (m_InodeLocks.Contains(inodeNo))
                     throw new UnauthorizedAccessException($"Inode {inodeNo} 已被使用");
+#if DEBUG_INODE
+                Console.WriteLine($"线程 {Thread.CurrentThread.ManagedThreadId} 申请了Inode {inodeNo} 权限");
+#endif
                 m_InodeLocks.Add(inodeNo);
             }
 
@@ -238,6 +242,9 @@ namespace OperatingSystemHW
         {
             lock (m_InodeMutex)
             {
+#if DEBUG_INODE
+                Console.WriteLine($"线程 {Thread.CurrentThread.ManagedThreadId} 释放了Inode {inodeNo} 权限");
+#endif
                 m_InodeLocks.Remove(inodeNo);
             }
         }

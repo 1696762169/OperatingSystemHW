@@ -79,49 +79,53 @@ namespace OperatingSystemHW
             Send(stream, $"连接服务器成功\n{User.Name}`{m_FileManager.GetCurrentPath()}>");
             byte[] buffer = new byte[1024];
             m_Exit = false;
-            while (!m_Exit)
+            try
             {
-                int readCount;
-                try
+                while (!m_Exit)
                 {
-                    readCount = stream.Read(buffer);
-                }
-                catch (IOException)
-                {
-                    return;
-                }
-                if (readCount <= 0)
-                    continue;
-                foreach (SerializeMsg msg in m_MsgParser.ParseMsg(buffer[..readCount]))
-                {
-                    switch (msg)
+                    int readCount = stream.Read(buffer);
+                    if (readCount <= 0)
+                        continue;
+                    foreach (SerializeMsg msg in m_MsgParser.ParseMsg(buffer[..readCount]))
                     {
-                    case StringMsg str:
-                        try
+                        switch (msg)
                         {
-                            // 发送消息
-                            ProcessCommand(str.data, stream);
-                            if (m_Exit)
+                        case StringMsg str:
+                            try
                             {
-                                Send(stream, "成功退出服务器，连接已断开\n");
-                                stream.Write(new ExitMsg().ToBytes());
-                                return;
+                                // 发送消息
+                                ProcessCommand(str.data, stream);
+                                if (m_Exit)
+                                {
+                                    Send(stream, "成功退出服务器，连接已断开\n");
+                                    stream.Write(new ExitMsg().ToBytes());
+                                }
                             }
+                            catch (UnauthorizedAccessException e)
+                            {
+                                // 发送占用错误
+                                Send(stream, e.Message + "\n", ConsoleColor.Yellow);
+                            }
+                            catch (Exception e)
+                            {
+                                // 发送错误
+                                Send(stream, e.Message + "\n", ConsoleColor.DarkRed);
+                            }
+                            Send(stream, $"{User.Name}`{m_FileManager.GetCurrentPath()}>");
+                            break;
                         }
-                        catch (UnauthorizedAccessException e)
-                        {
-                            // 发送占用错误
-                            Send(stream, e.Message + "\n", ConsoleColor.Yellow);
-                        }
-                        catch (Exception e)
-                        {
-                            // 发送错误
-                            Send(stream, e.Message + "\n", ConsoleColor.DarkRed);
-                        }
-                        Send(stream,$"{User.Name}`{m_FileManager.GetCurrentPath()}>");
-                        break;
                     }
                 }
+            }
+            catch (IOException)
+            {
+            }
+            finally
+            {
+                // 退出时关闭所有打开的文件
+                foreach (OpenFile file in User.OpenFiles.Values)
+                    m_FileManager.Close(file);
+                User.OpenFiles.Clear();
             }
         }
 
@@ -205,6 +209,12 @@ namespace OperatingSystemHW
                 break;
             case "output":
                 MoveFileIOut(args);
+                break;
+            case "open":
+                OpenFile(args);
+                break;
+            case "close":
+                CloseFile(args);
                 break;
             case "quit" or "exit":  // 退出应用
                 m_Exit = true;
@@ -353,6 +363,27 @@ namespace OperatingSystemHW
                              $"最后访问时间：{Utility.ToTime(file.inode.accessTime)}\n" +
                              $"最后修改时间：{Utility.ToTime(file.inode.modifyTime)}\n");
             }
+        }
+
+        // 打开文件
+        private void OpenFile(IReadOnlyList<string> args)
+        {
+            if (args.Count != 1)
+                throw new ArgumentException($"参数数量错误，应为 1 个参数，实际得到 {args.Count} 个");
+            int inodeNo = m_FileManager.GetFileInode(args[0]);
+            if (!User.OpenFiles.ContainsKey(inodeNo) || User.OpenFiles[inodeNo].Disposed)
+                User.OpenFiles[inodeNo] = m_FileManager.Open(args[0]);
+        }
+        // 关闭文件
+        private void CloseFile(IReadOnlyList<string> args)
+        {
+            if (args.Count != 1)
+                throw new ArgumentException($"参数数量错误，应为 1 个参数，实际得到 {args.Count} 个");
+            int inodeNo = m_FileManager.GetFileInode(args[0]);
+            if (!User.OpenFiles.TryGetValue(inodeNo, out OpenFile? file))
+                return;
+            m_FileManager.Close(file);
+            User.OpenFiles.Remove(inodeNo);
         }
         #endregion
 

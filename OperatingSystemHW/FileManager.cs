@@ -29,24 +29,17 @@ namespace OperatingSystemHW
             // 初始化根目录的 . 和 ..
             if (!m_InodeManager.Formatting)
                 return;
-            using Inode root = m_InodeManager.GetInode(DiskManager.ROOT_INODE_NO);
-            OpenFile file = new(root);
+            using OpenFile root = new(m_InodeManager.GetInode(DiskManager.ROOT_INODE_NO));
             DirectoryEntry selfEntry = new Entry(DiskManager.ROOT_INODE_NO, "./").ToDirectoryEntry();
             DirectoryEntry parentEntry = new Entry(DiskManager.ROOT_INODE_NO, "../").ToDirectoryEntry();
-            WriteStruct(file, ref selfEntry);
-            WriteStruct(file, ref parentEntry);
+            WriteStruct(root, ref selfEntry);
+            WriteStruct(root, ref parentEntry);
         }
 
         public OpenFile Open(string path, bool access = true)
         {
-            Inode inode = m_InodeManager.GetInode(GetFileInode(path));
-            if (access)
-            {
-                inode.accessTime = Utility.Time;
-                m_InodeManager.UpdateInode(inode.number, inode);
-            }
             // 打开文件即申请Inode使用权
-            return new OpenFile(inode);
+            return Open(GetFileInode(path), access);
         }
 
         public void Close(OpenFile file)
@@ -64,7 +57,7 @@ namespace OperatingSystemHW
             if (fileName.Length > DirectoryEntry.NAME_MAX_COUNT)
                 throw new ArgumentException("文件名过长");
             // 获取目标文件夹
-            using OpenFile dir = Open(m_InodeManager.GetInode(GetDirInode(path)));
+            using OpenFile dir = Open(GetDirInode(path));
 
             // 检查是否已经有重名文件
             try
@@ -94,7 +87,7 @@ namespace OperatingSystemHW
             if (PathUtility.IsDirectory(path))
                 throw new ArgumentException("路径不能是目录：" + path);
             // 获取目标文件夹
-            using OpenFile dir = Open(m_InodeManager.GetInode(GetDirInode(path)));
+            using OpenFile dir = Open(GetDirInode(path));
 
             // 检查是否存在文件
             int fileInodeNo;
@@ -111,7 +104,7 @@ namespace OperatingSystemHW
             try
             {
                 // 获取文件Inode权限
-                using OpenFile file = Open(m_InodeManager.GetInode(fileInodeNo));
+                using OpenFile file = Open(fileInodeNo);
                 // 获取文件扇区访问权限
                 fileSectors.AddRange(file.inode.GetUsedSectors(m_SectorManager)
                     .Select(pair => m_SectorManager.GetSector(pair.sectorNo)));
@@ -147,7 +140,7 @@ namespace OperatingSystemHW
 
             // 查找父目录
             path = PathUtility.ToFilePath(path);
-            using OpenFile parent = Open(m_InodeManager.GetInode(GetDirInode(path)));
+            using OpenFile parent = Open(GetDirInode(path));
 
             // 获取一个空闲Inode
             using OpenFile dir = Open(m_InodeManager.GetEmptyInode());
@@ -180,7 +173,7 @@ namespace OperatingSystemHW
                 throw new DirectoryNotFoundException("目录不存在：" + path);
 
             int dirInodeNo = GetDirInode(PathUtility.ToDirectoryPath(path));
-            OpenFile dir = Open(m_InodeManager.GetInode(dirInodeNo));
+            OpenFile dir = Open(dirInodeNo);
 
             // 检查目录是否为空目录
             if (!deleteSub)
@@ -212,7 +205,7 @@ namespace OperatingSystemHW
             }
 
             // 删除此目录（重新获得当前目录）
-            dir = Open(m_InodeManager.GetInode(dirInodeNo));
+            dir = Open(dirInodeNo);
             List<Sector> dirSectors = new();
             try
             {
@@ -221,7 +214,7 @@ namespace OperatingSystemHW
                     .Select(pair => m_SectorManager.GetSector(pair.sectorNo)));
 
                 // 删除文件目录项（可能失败）
-                using OpenFile parent = Open(m_InodeManager.GetInode(GetDirInode(PathUtility.ToFilePath(path))));
+                using OpenFile parent = Open(GetDirInode(PathUtility.ToFilePath(path)));
                 RemoveEntry(parent, dir.inode.number);
 
                 // 释放文件占用磁盘空间
@@ -393,7 +386,7 @@ namespace OperatingSystemHW
 
         public IEnumerable<Entry> GetEntries()
         {
-            using OpenFile dir = Open(m_InodeManager.GetInode(CurrentUser.CurrentNo));
+            using OpenFile dir = Open(CurrentUser.CurrentNo);
             return GetEntries(dir.inode, false);
         }
 
@@ -434,6 +427,15 @@ namespace OperatingSystemHW
             {
                 throw new ArgumentException($"未找到路径：{path}");
             }
+        }
+
+        public int GetFileInode(string path)
+        {
+            if (string.IsNullOrEmpty(path) || PathUtility.IsDirectory(path))
+                throw new ArgumentException("路径不能为空或者是目录");
+
+            using Inode dirInode = m_InodeManager.GetInode(GetDirInode(path));
+            return GetFileInode(dirInode, PathUtility.GetFileName(path));
         }
 
         public string GetCurrentPath()
@@ -562,15 +564,6 @@ namespace OperatingSystemHW
         #endregion
 
         #region 辅助函数
-        // 根据路径查找文件Inode序号
-        private int GetFileInode(string path)
-        {
-            if (string.IsNullOrEmpty(path) || PathUtility.IsDirectory(path))
-                throw new ArgumentException("路径不能为空或者是目录");
-
-            using Inode dirInode = m_InodeManager.GetInode(GetDirInode(path));
-            return GetFileInode(dirInode, PathUtility.GetFileName(path));
-        }
         // 根据目录Inode和文件名查找文件Inode序号
         private int GetFileInode(Inode dirInode, string fileName)
         {
@@ -643,6 +636,35 @@ namespace OperatingSystemHW
             }
         }
 
+        private OpenFile Open(int inodeNo, bool access = true)
+        {
+            try
+            {
+                Inode inode = m_InodeManager.GetInode(inodeNo);
+                if (access)
+                {
+                    inode.accessTime = Utility.Time;
+                    m_InodeManager.UpdateInode(inode.number, inode);
+                }
+                return new OpenFile(inode);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                if (!CurrentUser.OpenFiles.TryGetValue(inodeNo, out OpenFile? ret))
+                    throw;
+                if (ret.Disposed)
+                {
+                    CurrentUser.OpenFiles.Remove(inodeNo);
+                    throw;
+                }
+                if (access)
+                {
+                    ret.inode.accessTime = Utility.Time;
+                    m_InodeManager.UpdateInode(ret.inode.number, ret.inode);
+                }
+                return ret;
+            }
+        }
         private static OpenFile Open(Inode inode) => new(inode);
         #endregion
 

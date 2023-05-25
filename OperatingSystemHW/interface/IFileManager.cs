@@ -86,6 +86,11 @@ namespace OperatingSystemHW
         public bool DirectoryExists(string path);
 
         /// <summary>
+        /// 根据路径查找文件Inode序号
+        /// </summary>
+        public int GetFileInode(string path);
+
+        /// <summary>
         /// 切换当前工作目录
         /// </summary>
         public void ChangeDirectory(string path);

@@ -24,7 +24,7 @@ namespace OperatingSystemHW
         public int CurrentNo { get; private set; }   // 用户当前目录在外存中的Inode编号
         public string Current { get; private set; }  // 用户当前目录
 
-        //public List<Entry> CurrentEntries { get; private set; } = new(); // 当前目录下的文件目录项
+        public Dictionary<int, OpenFile> OpenFiles { get; private set; } = new();
 
         public User() { }
 
