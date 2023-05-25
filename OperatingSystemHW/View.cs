@@ -162,6 +162,9 @@ namespace OperatingSystemHW
             case "stat":
                 ShowFileState(args, stream);
                 break;
+            case "help":
+                Send(stream, HelpMessage());
+                break;
             default:
                 ProcessSilenceCommand(cmd, args);
                 break;
@@ -358,8 +361,9 @@ namespace OperatingSystemHW
             else
             {
                 using OpenFile file = m_FileManager.Open(args[0], false);
+                string sizeStr = file.inode.size > 1024 ? $"{file.inode.size / 1024.0, -10}KB" : $"{file.inode.size, -10}Bytes";
                 Send(stream, $"文件名：{args[0]}\n" +
-                             $"文件大小：{file.inode.size,-12} 文件Inode编号：{file.inode.number}\n" +
+                             $"文件大小：{sizeStr} 文件Inode编号：{file.inode.number}\n" +
                              $"最后访问时间：{Utility.ToTime(file.inode.accessTime)}\n" +
                              $"最后修改时间：{Utility.ToTime(file.inode.modifyTime)}\n");
             }
@@ -384,6 +388,30 @@ namespace OperatingSystemHW
                 return;
             m_FileManager.Close(file);
             User.OpenFiles.Remove(inodeNo);
+        }
+
+        // 帮助信息
+        private string HelpMessage()
+        {
+            const int ALIGNMENT = -10;
+
+            return @$"命令列表：
+· {"ls：",ALIGNMENT}显示当前目录下的文件和文件夹列表。
+· {"clear：",ALIGNMENT}清除控制台的显示内容。
+· {"cat：",ALIGNMENT}显示指定文件的内容。参数为文件路径。
+· {"stat：",ALIGNMENT}显示指定文件的状态信息。参数为文件路径，若不提供参数，则此命令将显示磁盘状态信息。
+· {"touch：",ALIGNMENT}创建一个新的空文件。参数为文件路径。
+· {"rm：",ALIGNMENT}删除指定文件。参数为文件路径。
+· {"mkdir：",ALIGNMENT}创建一个新的文件夹。参数为文件夹路径。
+· {"rmdir：",ALIGNMENT}删除指定文件夹。参数为文件夹路径，默认仅删除空文件夹，可提供-r参数递归删除其所有子文件夹。
+· {"cd：",ALIGNMENT}更改当前工作目录到指定的文件夹。参数为文件夹路径。
+· {"input：",ALIGNMENT}将外部文件系统中的文件移动到本系统中。参数为待移入文件路径、本系统中待创建文件路径。
+· {"output：",ALIGNMENT}将本系统中的文件移动到外部文件系统中。参数为本系统中待移出文件路径、外部系统待创建文件路径。
+· {"open：",ALIGNMENT}打开指定文件，没有实用价值，仅供测试文件访问权限使用。参数为文件路径。
+· {"close：",ALIGNMENT}关闭指定文件，没有实用价值，仅供测试文件访问权限使用。参数为文件路径。
+· {"quit/exit：",ALIGNMENT}退出客户端程序。
+· {"help：",ALIGNMENT}显示帮助信息。
+";
         }
         #endregion
 

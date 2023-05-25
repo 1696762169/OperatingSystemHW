@@ -16,7 +16,7 @@ namespace OperatingSystemHW
         public static string ToTime(int time)
         {
             DateTime dt = _StartTime.AddSeconds(time);
-            return dt.ToString("u");
+            return dt.ToString("u").Trim('Z');
         }
 
         public static byte[] EncodeString(string str) => Encoding.UTF8.GetBytes(str);

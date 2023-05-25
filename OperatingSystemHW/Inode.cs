@@ -8,16 +8,6 @@ using System.Threading.Tasks;
 namespace OperatingSystemHW
 {
     /// <summary>
-    /// Inode状态标志
-    /// </summary>
-    internal enum InodeFlag
-    {
-        Lock = 0x1,     // 索引节点上锁
-        Update = 0x2,   // 内存inode被修改过，需要更新相应外存inode
-        Access = 0x4,   // 内存inode被访问过，需要修改最近一次访问时间
-        Text = 0x8		// 内存inode对应进程图像的正文段
-    }
-    /// <summary>
     /// 内存Inode结构
     /// </summary>
     internal class Inode : IDisposable
