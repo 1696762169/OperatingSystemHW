@@ -19,12 +19,13 @@ namespace OperatingSystemHW
         private readonly ISectorManager m_SectorManager;    // 文件块管理器
         private readonly IInodeManager m_InodeManager;      // Inode管理器
 
-        public User CurrentUser { get; set; } = new();
+        public User CurrentUser { get; set; }
 
-        public FileManager(ISectorManager sectorManager, IInodeManager inodeManager)
+        public FileManager(ISectorManager sectorManager, IInodeManager inodeManager, User user)
         {
             m_SectorManager = sectorManager;
             m_InodeManager = inodeManager;
+            CurrentUser = user;
 
             // 初始化根目录的 . 和 ..
             if (!m_InodeManager.Formatting)
@@ -77,7 +78,9 @@ namespace OperatingSystemHW
             AddEntry(dir, new Entry(file.inode.number, PathUtility.GetFileName(path)));
 
             // 更新Inode信息
+            file.inode.Clear();
             file.inode.uid = (short)CurrentUser.UserId;
+            file.inode.accessTime = file.inode.modifyTime = Utility.Time;
             m_InodeManager.UpdateInode(file.inode.number, file.inode);
         }
 
@@ -156,6 +159,7 @@ namespace OperatingSystemHW
 
             // 更新Inode信息
             dir.inode.uid = (short)CurrentUser.UserId;
+            dir.inode.accessTime = dir.inode.modifyTime = Utility.Time;
             m_InodeManager.UpdateInode(dir.inode.number, dir.inode);
         }
 
@@ -489,6 +493,7 @@ namespace OperatingSystemHW
                 Console.WriteLine($"申请读取内容扇区失败：{e.Message}");
                 contentSectors.ForEach(sector => sector.Dispose());
             }
+            file.inode.accessTime = Utility.Time;
             return contentSectors;
         }
 

@@ -1,4 +1,4 @@
-﻿#define DEBUG_CHECK_FREE
+﻿//#define DEBUG_CHECK_FREE
 //#define DEBUG_SECTOR
 //#define DEBUG_INODE
 using System;

@@ -26,13 +26,12 @@ namespace OperatingSystemHW
         private bool m_EndInitializing; // 是否结束初始输入
         private readonly byte[] m_Buffer = new byte[4096];  // 读写数组
 
-        public View(ISuperBlockManager superBlockManager, IUserManager userManager, IFileManager fileManager)
+        public View(ISuperBlockManager superBlockManager, IUserManager userManager, IFileManager fileManager, User user)
         {
             m_SuperBlockManager = superBlockManager;
             m_UserManager = userManager;
-            User = userManager.GetUser(DiskUser.SUPER_USER_ID).Copy();
+            User = user;
             m_FileManager = fileManager;
-            m_FileManager.CurrentUser = User;
         }
 
         /// <summary>
@@ -361,7 +360,7 @@ namespace OperatingSystemHW
             else
             {
                 using OpenFile file = m_FileManager.Open(args[0], false);
-                string sizeStr = file.inode.size > 1024 ? $"{file.inode.size / 1024.0, -10}KB" : $"{file.inode.size, -10}Bytes";
+                string sizeStr = file.inode.size > 1024 ? $"{file.inode.size / 1024.0f:F1}KB" : $"{file.inode.size}Bytes";
                 Send(stream, $"文件名：{args[0]}\n" +
                              $"文件大小：{sizeStr} 文件Inode编号：{file.inode.number}\n" +
                              $"最后访问时间：{Utility.ToTime(file.inode.accessTime)}\n" +

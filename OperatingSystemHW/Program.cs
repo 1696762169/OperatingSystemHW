@@ -43,8 +43,9 @@ namespace OperatingSystemHW
 
                 ThreadPool.QueueUserWorkItem((client) =>
                 {
-                    FileManager fileManager = new(blockManager, blockManager);
-                    View view = new(fileSystem, fileSystem, fileManager);
+                    User user = fileSystem.GetUser(DiskUser.SUPER_USER_ID).Copy();
+                    FileManager fileManager = new(blockManager, blockManager, user);
+                    View view = new(fileSystem, fileSystem, fileManager, user);
                     view.Start(client);
 
                     Console.WriteLine($"客户端断开连接（{tcpClient.Client.RemoteEndPoint}）");

@@ -16,7 +16,7 @@ namespace OperatingSystemHW
     internal interface IFileManager
     {
         /// <summary>
-        /// 当前用户 需要由View设置
+        /// 当前用户
         /// </summary>
         public User CurrentUser { get; set; }
 
